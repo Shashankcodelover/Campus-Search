@@ -1,8 +1,8 @@
-# CampusSearch
+# CampusSearch v1.1
 
 A campus-restricted marketplace for reusable engineering-project components (Arduino boards, sensors, motors, full elective kits) that would otherwise sit idle after a project is submitted.
 
-This repo is a **working prototype**, not a hosted product: it has a real backend, a real database, and real business logic for every edge case discussed in planning. It's meant to run locally and be extended by whoever picks it up next.
+**v1.1** upgrades the working prototype with: Notion API integration, real-time notifications, a wanted/wishlist board, in-app messaging, user profiles with reputation badges, advanced search, and a premium glassmorphism UI.
 
 ## Why this exists
 
@@ -13,47 +13,60 @@ Engineering electives assign hands-on projects (robotics, embedded systems). Stu
 ```
 campussearch/
 ├── backend/     Node.js + Express API, SQLite database
-└── frontend/    React (Vite), mobile-responsive
+└── frontend/    React (Vite), mobile-responsive, premium dark UI
 ```
 
-**Backend → Frontend** over a REST API (`/api/*`). The frontend never talks to the database directly — all matching/moderation logic lives server-side so it can't be bypassed by tampering with the UI.
+**Backend → Frontend** over a REST API (`/api/*`). The frontend never talks to the database or Notion directly — all matching/moderation/integration logic lives server-side.
+
+### v1.1 Features
+
+| Feature | Description |
+|---------|-------------|
+| **Notion Knowledge Base** | Pulls pages from your Notion workspace via API, renders them in-app as a browsable docs hub |
+| **Real-time Notifications** | SSE-backed notification system with in-app bell, persistent DB storage, mark-as-read |
+| **Wanted/Wishlist Board** | Buyers post what they need; auto-matches notify them when matching items are listed |
+| **User Profiles & Badges** | Transaction history, reputation stats, earned badges (Trusted Seller, Quick Responder, Campus Hero) |
+| **In-App Messaging** | Buyer↔seller chat scoped to each request, with real-time push via SSE |
+| **Advanced Search** | Sort by price/rating/views, category pills, grid/list view toggle |
+| **Premium UI** | Glassmorphism, micro-animations, skeleton loaders, responsive mobile bottom nav |
 
 ### Data model (`backend/src/db/schema.sql`)
-- `users` — campus-email-gated accounts, rating aggregate, suspension flag
-- `listings` — supports sale vs. rent, kit-vs-part linking (`parent_kit_id`), auto-expiry
-- `requests` — the buyer→seller matching lifecycle (see below)
-- `flags` — moderation queue, auto- and human-reported
-- `ratings` — simple thumbs up/down, only after confirmed delivery
-- `fee_ledger` — platform fee owed per completed order, settled in batches (not per-transaction)
+- `users` — campus-email-gated accounts, rating aggregate, suspension flag, bio, avatar
+- `listings` — sale/rent, kit-vs-part linking, auto-expiry, image support, view count
+- `requests` — buyer→seller matching lifecycle
+- `notifications` — persisted in-app notifications
+- `messages` — buyer↔seller chat per request
+- `wishlists` — wanted items with auto-matching
+- `flags` — moderation queue (auto + manual)
+- `ratings` — thumbs up/down after confirmed delivery
+- `fee_ledger` — platform fee tracking
 
 ### The matching flow (`backend/src/services/matchingService.js`)
-This is the core mechanism from planning, implemented as real transactional logic:
-
 1. Buyer requests a listing → listing locks to `pending`, seller is notified — **no payment, no contact shared yet**
 2. Seller **accepts** (commits a delivery day) or **declines** within a response window
-3. Decline, or no response in time → auto-expires, listing reopens automatically (handled by a scheduled sweep, not manually)
+3. Decline, or no response in time → auto-expires, listing reopens automatically
 4. Only on accept is the seller's contact revealed to that buyer
-5. Buyer confirms delivery in-app → this is what unlocks the "pay now" moment client-side, and is when the platform fee is recorded
-6. Accepted but never confirmed within a few days → marked `no_show`, listing reopens (the no-show edge case flagged during planning)
-7. **Race condition handling:** a listing can only have one active request at a time — enforced inside a DB transaction, not just in the UI, so two buyers can't both "win" the same item
+5. Buyer confirms delivery → platform fee recorded
+6. **Race condition handling:** enforced inside a DB transaction
 
-### Moderation (`backend/src/services/moderationService.js`)
-Every new listing is screened against scam-pattern keywords (`"pay to confirm"`, `"registration fee"`, `"guaranteed internship"`, etc.) and flagged automatically for admin review — this is the internship-scam protection from planning, implemented as a real filter rather than a policy note.
-
-### Notifications (`backend/src/services/notificationService.js`)
-Deliberately abstracted behind one `notify()` function. Runs in console-log mode for the prototype; swapping in Twilio/MSG91 for real SMS is a one-function change, not a rewrite — this was intentional, since we decided not to pay for SMS infrastructure until real usage numbers justify it.
+### Notion Integration (`backend/src/services/notionService.js`)
+- Server-side proxy to the Notion API (key stays safe)
+- Searches pages, fetches block content recursively
+- Converts Notion blocks to HTML for rendering
+- 5-minute TTL cache to avoid rate limits
 
 ## Running it locally
 
 ### Backend
 ```bash
 cd backend
-cp .env.example .env      # edit CAMPUS_EMAIL_DOMAIN to your college's domain
+cp .env.example .env      # edit CAMPUS_EMAIL_DOMAIN and NOTION_API_KEY
 npm install
-npm run seed               # populates demo users + listings
-npm run dev                 # http://localhost:4000
+npm run seed               # populates 8 demo users + 14 listings + wishlists
+npm run dev                # http://localhost:4000
 ```
 Demo login after seeding: any seeded email (e.g. `aravind.k@college.edu`) / password `demo1234`.
+Admin login: `admin@college.edu` / `demo1234`.
 
 ### Frontend
 ```bash
@@ -62,15 +75,15 @@ npm install
 npm run dev                 # http://localhost:5173, proxies /api to :4000
 ```
 
-## What's deliberately NOT built yet (see roadmap doc)
-- Real SMS delivery (interface is ready, provider isn't wired up)
-- Real payment collection (by design — platform never holds funds, see planning notes)
-- Production-grade auth (JWT in localStorage is fine for a prototype; a real deployment should move to httpOnly cookies)
-- Postgres migration for multi-server scale (schema is written to make this a small change, not a rewrite)
-- Faculty/lab surplus as a separate supply source
-- Full roadmap and open decisions: see the linked Notion page.
+## Notion Setup
+1. Create a Notion integration at https://www.notion.so/my-integrations
+2. Copy the integration token to `backend/.env` as `NOTION_API_KEY`
+3. Share pages with the integration (click "..." on a page → "Connections" → add your integration)
+4. Pages will appear in the "Docs" tab of the app
 
-## Tech choices, briefly
-- **SQLite over Postgres for now** — zero setup, fine for hundreds of concurrent users on one campus; the schema is portable if this needs to scale past that.
-- **JWT auth over sessions** — stateless, simple to reason about for a small team maintaining this after the original author graduates.
-- **No payment processor integrated** — collecting/holding student payments has real licensing implications; peer-to-peer UPI keeps this a listing/matching tool, not a payments company.
+## Tech choices
+- **SQLite over Postgres for now** — zero setup, fine for hundreds of concurrent users on one campus
+- **JWT auth over sessions** — stateless, simple for a small team
+- **No payment processor** — peer-to-peer UPI keeps this a listing/matching tool
+- **SSE for notifications** — simpler than WebSockets, native browser support
+- **Notion API for docs** — leverages existing Notion workspace without duplicating content
