@@ -1,0 +1,85 @@
+:root {
+  --bg: #0d1310;
+  --panel: #151f1a;
+  --raised: #1c2921;
+  --trace: #26362c;
+  --signal: #6ee7a0;
+  --amber: #f0a93b;
+  --red: #e2665f;
+  --text: #e9f1ec;
+  --muted: #8fa298;
+  --muted-dim: #63756a;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.container { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 7px;
+  padding: 10px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+}
+.btn-primary { background: var(--signal); color: var(--bg); }
+.btn-ghost { background: transparent; border: 1px solid var(--trace); color: var(--text); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.input, select.input {
+  background: #111a15;
+  border: 1px solid var(--trace);
+  border-radius: 6px;
+  padding: 9px 10px;
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: "Inter", sans-serif;
+  outline: none;
+  width: 100%;
+}
+
+.card { background: var(--panel); border: 1px solid var(--trace); border-radius: 10px; }
+.mono { font-family: "JetBrains Mono", monospace; }
+
+/* Listing table -> stacked cards on mobile */
+.listing-row {
+  display: grid;
+  grid-template-columns: 90px 1fr auto auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--trace);
+}
+.listing-row:last-child { border-bottom: none; }
+
+@media (max-width: 720px) {
+  .hero-grid { grid-template-columns: 1fr !important; }
+  .listing-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .listing-row .row-id { order: 1; }
+  .listing-row .row-main { order: 2; }
+  .listing-row .row-price { order: 3; justify-self: start !important; }
+  .listing-row .row-status { order: 4; justify-self: start !important; }
+  .listing-row .row-action { order: 5; justify-self: stretch !important; width: 100%; }
+  .listing-row .row-action button { width: 100%; }
+  .nav-tabs { display: none; }
+  .nav-tabs-mobile { display: flex !important; }
+  h1 { font-size: 28px !important; }
+}
+
+.nav-tabs-mobile { display: none; }
