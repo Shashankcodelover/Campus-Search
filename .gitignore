@@ -4,5 +4,9 @@ node_modules/
 *.db-wal
 *.db-shm
 .env
+.env.local
+notion.txt
 dist/
 .DS_Store
+labtop b/
+remainder/
