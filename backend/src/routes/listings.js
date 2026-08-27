@@ -154,6 +154,30 @@ router.delete("/:id", requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// PATCH /api/listings/:id — edit listing details
+router.patch("/:id", requireAuth, (req, res) => {
+  const { item_name, description, price, quantity, condition_notes, listing_type, return_by } = req.body;
+  const listing = db.prepare("SELECT * FROM listings WHERE id = ?").get(req.params.id);
+  if (!listing) return res.status(404).json({ error: "Listing not found." });
+  if (listing.seller_id !== req.user.id) return res.status(403).json({ error: "Not your listing." });
+
+  db.prepare(`
+    UPDATE listings 
+    SET item_name = ?, description = ?, price = ?, quantity = ?, condition_notes = ?, listing_type = ?, return_by = ?
+    WHERE id = ?
+  `).run(
+    item_name || listing.item_name,
+    description || listing.description,
+    price !== undefined ? price : listing.price,
+    quantity !== undefined ? quantity : listing.quantity,
+    condition_notes || listing.condition_notes,
+    listing_type || listing.listing_type,
+    return_by || listing.return_by,
+    req.params.id
+  );
+  res.json({ ok: true });
+});
+
 // Sweep stale listings — call from a scheduled job (see server.js)
 function sweepExpiredListings() {
   db.prepare(`UPDATE listings SET status = 'expired' WHERE status = 'available' AND expires_at < datetime('now')`).run();

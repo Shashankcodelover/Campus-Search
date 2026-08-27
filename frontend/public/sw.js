@@ -32,21 +32,20 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
-      
-      return fetch(event.request).then((networkResponse) => {
-        return caches.open(CACHE_NAME).then((cache) => {
-          // Cache successful responses for standard assets
-          if (networkResponse.ok && event.request.url.startsWith('http')) {
-            cache.put(event.request, networkResponse.clone());
-          }
-          return networkResponse;
-        });
-      }).catch(() => {
-        // Fallback for offline mode (e.g., return cached index.html for navigation)
+    fetch(event.request).then((networkResponse) => {
+      // Cache the latest version of the asset
+      return caches.open(CACHE_NAME).then((cache) => {
+        if (networkResponse.ok && event.request.url.startsWith('http')) {
+          cache.put(event.request, networkResponse.clone());
+        }
+        return networkResponse;
+      });
+    }).catch(() => {
+      // If network fails, try to return from cache
+      return caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) return cachedResponse;
         if (event.request.mode === 'navigate') {
-          return caches.match('/');
+          return caches.match('./');
         }
       });
     })

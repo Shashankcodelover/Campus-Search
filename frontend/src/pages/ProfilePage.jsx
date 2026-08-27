@@ -5,6 +5,7 @@ import { Avatar } from "../components/common/Avatar";
 import { StatusDot } from "../components/common/StatusDot";
 import { EmptyState } from "../components/common/EmptyState";
 import { Skeleton } from "../components/common/Skeleton";
+import { ListItemModal } from "../components/modals/ListItemModal";
 
 export function ProfilePage() {
   const [profile, setProfile] = useState(null);
@@ -13,6 +14,7 @@ export function ProfilePage() {
   const [qrImage, setQrImage] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [editItem, setEditItem] = useState(null);
 
   useEffect(() => {
     loadProfile();
@@ -190,17 +192,26 @@ export function ProfilePage() {
           <h4 style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}><Package size={15} /> Recent Listings</h4>
           <div className="card" style={{ overflow: "hidden" }}>
             {profile.recentListings.map((l) => (
-              <div key={l.id} className="listing-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
+              <div key={l.id} className="listing-row" style={{ gridTemplateColumns: "1fr auto auto auto" }}>
                 <div>
                   <div style={{ fontSize: 13.5, fontWeight: 500 }}>{l.item_name}</div>
                   <div style={{ fontSize: 11, color: "var(--muted)" }}>{l.category}</div>
                 </div>
                 <span className="font-mono" style={{ fontSize: 13, color: "var(--signal)" }}>{l.price === 0 ? "Free" : `₹${l.price}`}</span>
                 <StatusDot status={l.status} />
+                <button onClick={() => setEditItem(l)} className="btn-icon" style={{ padding: "4px" }} title="Edit Listing">✏️</button>
               </div>
             ))}
           </div>
         </>
+      )}
+
+      {editItem && (
+        <ListItemModal 
+          editItem={editItem} 
+          onClose={() => setEditItem(null)} 
+          onCreated={() => { setEditItem(null); loadProfile(); }} 
+        />
       )}
     </div>
   );

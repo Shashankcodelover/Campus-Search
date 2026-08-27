@@ -47,6 +47,7 @@ export const api = {
   },
   getListing: (id) => request(`/listings/${id}`),
   createListing: (body) => request("/listings", { method: "POST", body: JSON.stringify(body) }),
+  updateListing: (id, body) => request(`/listings/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteListing: (id) => request(`/listings/${id}`, { method: "DELETE" }),
 
   // ---- Requests (direct matching flow) ----

@@ -3,8 +3,17 @@ import { X } from "lucide-react";
 import { api } from "../../api";
 import { CATEGORIES } from "../../constants/categories";
 
-export function ListItemModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({
+export function ListItemModal({ onClose, onCreated, editItem }) {
+  const [form, setForm] = useState(editItem ? {
+    item_name: editItem.item_name,
+    category: editItem.category,
+    condition_notes: editItem.condition_notes,
+    description: editItem.description || "",
+    price: editItem.price,
+    quantity: editItem.quantity,
+    listing_type: editItem.listing_type || "sale",
+    return_by: editItem.return_by || ""
+  } : {
     item_name: "",
     category: CATEGORIES[0],
     condition_notes: "",
@@ -12,6 +21,7 @@ export function ListItemModal({ onClose, onCreated }) {
     price: "",
     quantity: "1",
     listing_type: "sale",
+    return_by: ""
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,11 +31,17 @@ export function ListItemModal({ onClose, onCreated }) {
   const submit = async () => {
     setLoading(true);
     try {
-      await api.createListing({
+      const payload = {
         ...form,
         price: Number(form.price) || 0,
         quantity: Number(form.quantity) || 1,
-      });
+      };
+      
+      if (editItem) {
+        await api.updateListing(editItem.id, payload);
+      } else {
+        await api.createListing(payload);
+      }
       onCreated();
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
@@ -35,7 +51,7 @@ export function ListItemModal({ onClose, onCreated }) {
     <div className="overlay" onClick={onClose}>
       <div className="card card-glow modal" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="modal__close"><X size={16} /></button>
-        <h3 className="modal__title">📦 List a Component</h3>
+        <h3 className="modal__title">{editItem ? "✏️ Edit Listing" : "📦 List a Component"}</h3>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input className="input" placeholder="Item name * (e.g. Arduino Uno R3)" value={form.item_name} onChange={set("item_name")} id="list-name" />
           
@@ -58,11 +74,11 @@ export function ListItemModal({ onClose, onCreated }) {
 
           <input className="input" placeholder="Condition * (e.g. Working, like new)" value={form.condition_notes} onChange={set("condition_notes")} id="list-condition" />
           <textarea className="input" placeholder="Description (pinout details, cables included, etc.)" value={form.description} onChange={set("description")} id="list-description" rows={3} />
+          {error && <div style={{ color: "var(--red)", fontSize: 13 }}>{error}</div>}
+          <button onClick={submit} className="btn btn-primary" disabled={!valid || loading} id="list-submit">
+            {loading ? "Saving..." : (editItem ? "Save Changes" : "Post Listing")}
+          </button>
         </div>
-        {error && <div style={{ color: "var(--red)", fontSize: 12.5, marginTop: 10 }}>{error}</div>}
-        <button disabled={!valid || loading} onClick={submit} className="btn btn-primary" style={{ width: "100%", marginTop: 16 }} id="list-submit">
-          {loading ? "Publishing…" : "Publish Listing"}
-        </button>
       </div>
     </div>
   );
