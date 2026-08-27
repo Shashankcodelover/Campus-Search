@@ -151,3 +151,8 @@ export function clearToken() {
 export function hasToken() {
   return !!localStorage.getItem("cs_token");
 }
+
+export default api;
+if (typeof window !== "undefined") {
+  window.api = api;
+}

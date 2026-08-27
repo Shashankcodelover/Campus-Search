@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { LayoutGrid, Inbox, Radio, Heart, BookOpen, User, ShieldCheck, Moon, Sun } from "lucide-react";
-import { hasToken, clearToken, connectSSE } from "./api";
+import { api, hasToken, clearToken, connectSSE } from "./api";
 import { Navbar } from "./components/layout/Navbar";
 import { AuthScreen } from "./components/modals/AuthScreen";
 import { RequestModal } from "./components/modals/RequestModal";

@@ -9,7 +9,25 @@ const app = express();
 
 // Security & Middleware
 app.use(helmet({ contentSecurityPolicy: false })); // Allow inline SVG / images / dev resources
-app.use(cors());
+const allowedOrigins = [
+  "http://shashankj.tech",
+  "https://shashankj.tech",
+  "https://campus-search-theta.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://localhost:4000"
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith(".shashankj.tech") || origin.endsWith(".vercel.app")) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: "15mb" })); // Base64 ID photos & listing image uploads
 app.use(morgan("dev"));
 

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Cpu, Bell, Plus, LogOut, Menu, X } from "lucide-react";
+import { Cpu, Bell, Globe, Plus, LogOut, Menu, X } from "lucide-react";
 import { NotificationPanel } from "../notifications/NotificationPanel";
 
 export function Navbar({ tabs, activeTab, setTab, unreadCount, showNotifications, setShowNotifications, onOpenListModal, onLogout, themeToggle }) {
@@ -28,6 +28,7 @@ export function Navbar({ tabs, activeTab, setTab, unreadCount, showNotifications
           </div>
 
           <div className="navbar__actions">
+            <a href="http://shashankj.tech/" target="_blank" rel="noopener noreferrer" className="btn-icon desktop-only" title="Portfolio (shashankj.tech)"><Globe size={15} /></a>
             {themeToggle}
 
             <div className="notification-bell" style={{ position: "relative" }}>
