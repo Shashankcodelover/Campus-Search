@@ -29,6 +29,15 @@ export default function App() {
     localStorage.setItem("cs_theme", theme);
   }, [theme]);
 
+  useEffect(() => {
+    const handleAuthError = () => {
+      clearToken();
+      setAuthed(false);
+    };
+    window.addEventListener("auth_error", handleAuthError);
+    return () => window.removeEventListener("auth_error", handleAuthError);
+  }, []);
+
   // Real-time notification polling
   useEffect(() => {
     if (!authed) return;

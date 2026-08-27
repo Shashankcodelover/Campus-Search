@@ -19,15 +19,8 @@ export function RequestModal({ listing, onClose, onRefresh }) {
   const [request, setRequest] = useState(null);
   const [contact, setContact] = useState(null);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await api.createRequest(listing.id);
-        setRequest(r);
-      } catch (e) { setError(e.message); }
-    })();
-  }, [listing.id]);
+  const [quantity, setQuantity] = useState(1);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!request) return;
@@ -47,6 +40,18 @@ export function RequestModal({ listing, onClose, onRefresh }) {
     return () => clearInterval(poll);
   }, [request]);
 
+  const handleCreateRequest = async () => {
+    setCreating(true);
+    try {
+      const r = await api.createRequest(listing.id, quantity);
+      setRequest(r);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const close = () => { onRefresh(); onClose(); };
 
   return (
@@ -56,11 +61,47 @@ export function RequestModal({ listing, onClose, onRefresh }) {
         <div className="font-mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>REQUEST · {listing.id?.slice(0, 8)}</div>
         <h3 className="modal__title">{listing.item_name}</h3>
 
-        {error && <div style={{ color: "var(--red)", fontSize: 13 }}>{error}</div>}
+        {error && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
 
-        {!error && (
+        {!request && !error && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 14, fontWeight: 500 }}>Quantity to request:</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ padding: "4px 8px" }}
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  disabled={quantity <= 1}
+                >-</button>
+                <span style={{ fontSize: 16, fontWeight: 600, width: 24, textAlign: "center" }}>{quantity}</span>
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ padding: "4px 8px" }}
+                  onClick={() => setQuantity(Math.min(listing.quantity || 1, quantity + 1))}
+                  disabled={quantity >= (listing.quantity || 1)}
+                >+</button>
+              </div>
+            </div>
+            
+            <div style={{ fontSize: 12, color: "var(--muted)" }}>
+              {listing.quantity || 1} available in stock. Total price: ₹{(listing.price || 0) * quantity}
+            </div>
+
+            <button 
+              onClick={handleCreateRequest} 
+              disabled={creating || quantity > (listing.quantity || 1)} 
+              className="btn btn-primary" 
+              style={{ width: "100%" }}
+            >
+              {creating ? "Sending Request..." : "Request Item"}
+            </button>
+          </div>
+        )}
+
+        {request && !error && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <StepRow done icon={<Radio size={15} />} label="Seller notified" sub="No payment or contact shared yet" />
+            <StepRow done icon={<Radio size={15} />} label={`Seller notified (Qty: ${request.quantity || quantity})`} sub="No payment or contact shared yet" />
             <StepRow
               done={request?.status === "accepted"}
               active={request?.status === "notified"}

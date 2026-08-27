@@ -8,8 +8,8 @@ const router = express.Router();
 // Buyer requests a listing
 router.post("/", requireAuth, (req, res) => {
   try {
-    const { listing_id } = req.body;
-    const request = matchingService.createRequest(listing_id, req.user.id);
+    const { listing_id, quantity = 1 } = req.body;
+    const request = matchingService.createRequest(listing_id, req.user.id, parseInt(quantity, 10));
     res.status(201).json(request);
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });

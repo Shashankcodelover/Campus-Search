@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS requests (
   id TEXT PRIMARY KEY,
   listing_id TEXT NOT NULL REFERENCES listings(id),
   buyer_id TEXT NOT NULL REFERENCES users(id),
+  quantity INTEGER NOT NULL DEFAULT 1,
   status TEXT NOT NULL DEFAULT 'notified', -- notified | accepted | declined | expired | delivered | cancelled | no_show
   delivery_day TEXT,
   accepted_at TEXT,

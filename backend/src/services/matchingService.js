@@ -25,12 +25,12 @@ const INQUIRY_WINDOW_MS = 2 * 60 * 60 * 1000;       // 2 hours for inquiry respo
 // FLOW A: Direct Request
 // =============================================
 
-function createRequest(listingId, buyerId) {
+function createRequest(listingId, buyerId, quantity = 1) {
   const tx = db.transaction(() => {
     const listing = db.prepare("SELECT * FROM listings WHERE id = ?").get(listingId);
     if (!listing) throw new HttpError(404, "Listing not found");
-    if (listing.status !== "available") {
-      throw new HttpError(409, "This item is no longer available — someone else already has an active request on it.");
+    if (listing.status === "claimed" || listing.quantity < quantity) {
+      throw new HttpError(409, "This item does not have enough stock available.");
     }
     if (listing.seller_id === buyerId) {
       throw new HttpError(400, "You can't request your own listing.");
@@ -38,9 +38,13 @@ function createRequest(listingId, buyerId) {
 
     const id = uuid();
     db.prepare(
-      `INSERT INTO requests (id, listing_id, buyer_id, status) VALUES (?, ?, ?, 'notified')`
-    ).run(id, listingId, buyerId);
-    db.prepare(`UPDATE listings SET status = 'pending', updated_at = datetime('now') WHERE id = ?`).run(listingId);
+      `INSERT INTO requests (id, listing_id, buyer_id, quantity, status) VALUES (?, ?, ?, ?, 'notified')`
+    ).run(id, listingId, buyerId, quantity);
+
+    const newQty = listing.quantity - quantity;
+    const newStatus = newQty > 0 ? "available" : "pending";
+    db.prepare(`UPDATE listings SET quantity = ?, status = ?, updated_at = datetime('now') WHERE id = ?`).run(newQty, newStatus, listingId);
+    
     return id;
   });
 
@@ -75,7 +79,7 @@ function respondToRequest(requestId, sellerId, decision, deliveryDay) {
       ).run(deliveryDay, requestId);
     } else {
       db.prepare(`UPDATE requests SET status = 'declined', responded_at = datetime('now') WHERE id = ?`).run(requestId);
-      db.prepare(`UPDATE listings SET status = 'available', updated_at = datetime('now') WHERE id = ?`).run(request.listing_id);
+      db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = datetime('now') WHERE id = ?`).run(request.listing_id);
     }
   });
 
@@ -112,16 +116,11 @@ function confirmDelivered(requestId, buyerId) {
 
   db.prepare(`UPDATE requests SET status = 'delivered', delivered_confirmed_at = datetime('now') WHERE id = ?`).run(requestId);
   
-  // Inventory quantity management:
-  // Decrement stock quantity by 1. If stock <= 0, mark as claimed (sold out). Otherwise keep available.
+  // Stock was reserved at request time. If quantity is 0, we can safely mark as claimed.
   const listingItem = db.prepare("SELECT * FROM listings WHERE id = ?").get(request.listing_id);
-  const newQty = Math.max(0, (listingItem.quantity || 1) - 1);
-  const newStatus = newQty > 0 ? "available" : "claimed";
-
-  db.prepare(
-    `UPDATE listings SET quantity = ?, status = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(newQty, newStatus, request.listing_id);
-
+  if (listingItem.quantity <= 0) {
+    db.prepare(`UPDATE listings SET status = 'claimed', updated_at = datetime('now') WHERE id = ?`).run(request.listing_id);
+  }
 
   const listing = db.prepare("SELECT l.*, u.* FROM listings l JOIN users u ON u.id = l.seller_id WHERE l.id = ?").get(request.listing_id);
   const FLAT_FEE = 3;
@@ -307,7 +306,7 @@ function sweepExpiredRequests() {
   for (const r of stuckNotified) {
     if (now - new Date(r.created_at + "Z").getTime() > RESPONSE_WINDOW_MS) {
       db.prepare(`UPDATE requests SET status = 'expired', responded_at = datetime('now') WHERE id = ?`).run(r.id);
-      db.prepare(`UPDATE listings SET status = 'available', updated_at = datetime('now') WHERE id = ?`).run(r.listing_id);
+      db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = datetime('now') WHERE id = ?`).run(r.listing_id);
 
       // Notify buyer
       const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(r.buyer_id);
@@ -328,7 +327,7 @@ function sweepExpiredRequests() {
   for (const r of stuckAccepted) {
     if (r.accepted_at && now - new Date(r.accepted_at + "Z").getTime() > NO_SHOW_WINDOW_MS) {
       db.prepare(`UPDATE requests SET status = 'no_show' WHERE id = ?`).run(r.id);
-      db.prepare(`UPDATE listings SET status = 'available', updated_at = datetime('now') WHERE id = ?`).run(r.listing_id);
+      db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = datetime('now') WHERE id = ?`).run(r.listing_id);
     }
   }
 

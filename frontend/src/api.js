@@ -24,7 +24,13 @@ async function request(path, options = {}) {
     },
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Request failed");
+  if (!res.ok) {
+    if (res.status === 401) {
+      clearToken();
+      window.dispatchEvent(new Event("auth_error"));
+    }
+    throw new Error(data.error || "Request failed");
+  }
   return data;
 }
 
@@ -44,7 +50,7 @@ export const api = {
   deleteListing: (id) => request(`/listings/${id}`, { method: "DELETE" }),
 
   // ---- Requests (direct matching flow) ----
-  createRequest: (listing_id) => request("/requests", { method: "POST", body: JSON.stringify({ listing_id }) }),
+  createRequest: (listing_id, quantity = 1) => request("/requests", { method: "POST", body: JSON.stringify({ listing_id, quantity }) }),
   respondToRequest: (id, decision, delivery_day) =>
     request(`/requests/${id}/respond`, { method: "PATCH", body: JSON.stringify({ decision, delivery_day }) }),
   confirmDelivered: (id) => request(`/requests/${id}/confirm-delivered`, { method: "PATCH" }),
