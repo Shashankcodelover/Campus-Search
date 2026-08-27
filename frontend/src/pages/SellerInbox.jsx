@@ -4,11 +4,13 @@ import { api } from "../api";
 import { StatusDot } from "../components/common/StatusDot";
 import { Badge } from "../components/common/Badge";
 import { EmptyState } from "../components/common/EmptyState";
+import { ChatBox } from "../components/common/ChatBox";
 
 export function SellerInbox({ onOpenPayment }) {
   const [requests, setRequests] = useState([]);
   const [allRequests, setAllRequests] = useState({ asBuyer: [], asSeller: [] });
   const [loading, setLoading] = useState(true);
+  const [activeChat, setActiveChat] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -82,6 +84,41 @@ export function SellerInbox({ onOpenPayment }) {
         </div>
       )}
 
+      {/* Active Incoming Requests (Seller View: Accepted, waiting for buyer to confirm delivery) */}
+      {allRequests.asSeller.filter((r) => r.status === "accepted" || r.status === "delivered").length > 0 && (
+        <div style={{ marginBottom: "28px" }}>
+          <h4 style={{ color: "var(--signal)", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+            <MessageSquare size={15} /> Active Incoming Requests (To Deliver)
+          </h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {allRequests.asSeller
+              .filter((r) => r.status === "accepted" || r.status === "delivered")
+              .map((r) => (
+                <div key={r.id} className="card" style={{ padding: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                    <div>
+                      <h4 style={{ fontSize: 15 }}>{r.item_name}</h4>
+                      <p style={{ fontSize: 12, color: "var(--muted)" }}>
+                        Committed Delivery: <strong style={{ color: "var(--signal)" }}>{r.delivery_day}</strong>
+                      </p>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button className="btn btn-secondary" onClick={() => setActiveChat(activeChat === r.id ? null : r.id)}>
+                        <MessageSquare size={14} /> {activeChat === r.id ? "Close Chat" : "Chat with Buyer"}
+                      </button>
+                    </div>
+                  </div>
+                  {activeChat === r.id && (
+                    <div style={{ marginTop: 16 }}>
+                      <ChatBox requestId={r.id} />
+                    </div>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Active Accepted Requests (Buyer View) */}
       {allRequests.asBuyer.filter((r) => r.status === "accepted" || r.status === "delivered").length > 0 && (
         <div style={{ marginBottom: "28px" }}>
@@ -92,25 +129,35 @@ export function SellerInbox({ onOpenPayment }) {
             {allRequests.asBuyer
               .filter((r) => r.status === "accepted" || r.status === "delivered")
               .map((r) => (
-                <div key={r.id} className="card" style={{ padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-                  <div>
-                    <h4 style={{ fontSize: 15 }}>{r.item_name}</h4>
-                    <p style={{ fontSize: 12, color: "var(--muted)" }}>
-                      Delivery committed: <strong style={{ color: "var(--signal)" }}>{r.delivery_day || "Scheduled"}</strong>
-                    </p>
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {r.status === "accepted" && (
-                      <button className="btn btn-primary" onClick={() => handleConfirmDelivery(r.id)}>
-                        <CheckCircle2 size={14} /> Confirm Delivery & Pay UPI
+                <div key={r.id} className="card" style={{ padding: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                    <div>
+                      <h4 style={{ fontSize: 15 }}>{r.item_name}</h4>
+                      <p style={{ fontSize: 12, color: "var(--muted)" }}>
+                        Delivery committed: <strong style={{ color: "var(--signal)" }}>{r.delivery_day || "Scheduled"}</strong>
+                      </p>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button className="btn btn-secondary" onClick={() => setActiveChat(activeChat === r.id ? null : r.id)}>
+                        <MessageSquare size={14} /> {activeChat === r.id ? "Close Chat" : "Chat"}
                       </button>
-                    )}
-                    {r.status === "delivered" && (
-                      <button className="btn btn-secondary" onClick={() => onOpenPayment && onOpenPayment(r.id)}>
-                        <QrCode size={14} /> View UPI QR Code
-                      </button>
-                    )}
+                      {r.status === "accepted" && (
+                        <button className="btn btn-primary" onClick={() => handleConfirmDelivery(r.id)}>
+                          <CheckCircle2 size={14} /> Confirm Delivery & Pay UPI
+                        </button>
+                      )}
+                      {r.status === "delivered" && (
+                        <button className="btn btn-secondary" onClick={() => onOpenPayment && onOpenPayment(r.id)}>
+                          <QrCode size={14} /> View UPI QR Code
+                        </button>
+                      )}
+                    </div>
                   </div>
+                  {activeChat === r.id && (
+                    <div style={{ marginTop: 16 }}>
+                      <ChatBox requestId={r.id} />
+                    </div>
+                  )}
                 </div>
               ))}
           </div>

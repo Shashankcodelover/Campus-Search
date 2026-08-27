@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Radio, CheckCircle2, Phone, ShieldAlert, X } from "lucide-react";
 import { api } from "../../api";
+import { ChatBox } from "../common/ChatBox";
 
 function StepRow({ active, done, icon, label, sub }) {
   const state = done ? "done" : active ? "active" : "pending";
@@ -127,6 +128,11 @@ export function RequestModal({ listing, onClose, onRefresh }) {
               <ShieldAlert size={14} className="alert__icon" />
               Pay only after you receive and check the item. Never pay upfront.
             </div>
+            
+            <div style={{ marginTop: 16 }}>
+              <ChatBox requestId={request.id} />
+            </div>
+
             <button
               onClick={async () => { await api.confirmDelivered(request.id); close(); }}
               className="btn btn-ghost" style={{ width: "100%", marginTop: 12 }}

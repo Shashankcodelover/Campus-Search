@@ -796,7 +796,7 @@ select.input {
 .notification-panel {
   position: absolute;
   top: calc(100% + 8px);
-  right: -10px;
+  right: 0;
   width: 360px;
   max-width: calc(100vw - 32px);
   max-height: 440px;

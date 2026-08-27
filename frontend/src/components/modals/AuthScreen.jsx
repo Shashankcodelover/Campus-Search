@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { Cpu, Upload, ShieldCheck, Camera } from "lucide-react";
+import { Cpu, Upload, ShieldCheck, Camera, Eye, EyeOff } from "lucide-react";
 import { api, setToken } from "../../api";
 
 export function AuthScreen({ onAuthed }) {
   const [mode, setMode] = useState("login");
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -117,7 +118,17 @@ export function AuthScreen({ onAuthed }) {
           )}
 
           <input className="input" placeholder="Email Address *" value={form.email} onChange={set("email")} id="auth-email" required />
-          <input className="input" type="password" placeholder="Password *" value={form.password} onChange={set("password")} id="auth-password" required />
+          <div style={{ position: "relative" }}>
+            <input className="input" type={showPassword ? "text" : "password"} placeholder="Password *" value={form.password} onChange={set("password")} id="auth-password" required style={{ width: "100%", paddingRight: "40px" }} />
+            <button 
+              type="button" 
+              className="btn-ghost" 
+              onClick={() => setShowPassword(!showPassword)} 
+              style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", padding: "4px", color: "var(--muted)" }}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
         </div>
 
         {error && <div style={{ color: "var(--red)", fontSize: 12.5, marginTop: 10 }}>{error}</div>}
