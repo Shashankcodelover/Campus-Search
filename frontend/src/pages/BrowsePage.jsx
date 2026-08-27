@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Search, Grid3X3, List } from "lucide-react";
+import { Search, Grid3X3, List, Radio, CheckCircle } from "lucide-react";
 import { api } from "../api";
 import { CATEGORIES, CATEGORY_ICONS } from "../constants/categories";
 import { StatusDot } from "../components/common/StatusDot";
@@ -7,6 +7,18 @@ import { Badge } from "../components/common/Badge";
 import { Avatar } from "../components/common/Avatar";
 import { EmptyState } from "../components/common/EmptyState";
 import { Skeleton } from "../components/common/Skeleton";
+import { InquiryModal } from "../components/modals/InquiryModal";
+
+// Real Unsplash imagery for component categories
+const CATEGORY_IMAGES = {
+  Microcontrollers: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=400&q=80",
+  Sensors: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=400&q=80",
+  "Motors & Actuators": "https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=400&q=80",
+  "Power & Wiring": "https://images.unsplash.com/photo-1555664424-778a1e5e1b48?auto=format&fit=crop&w=400&q=80",
+  Tools: "https://images.unsplash.com/photo-1581092162384-8987c1d64718?auto=format&fit=crop&w=400&q=80",
+  "Full Kits": "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=400&q=80",
+  "Passive Components": "https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?auto=format&fit=crop&w=400&q=80",
+};
 
 export function BrowsePage({ onRequestListing }) {
   const [listings, setListings] = useState([]);
@@ -15,6 +27,7 @@ export function BrowsePage({ onRequestListing }) {
   const [sort, setSort] = useState("newest");
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("grid");
+  const [inquiryModalQuery, setInquiryModalQuery] = useState(null);
 
   const loadListings = useCallback(async () => {
     setLoading(true);
@@ -29,10 +42,10 @@ export function BrowsePage({ onRequestListing }) {
 
   return (
     <div className="page-enter">
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <h1 style={{ marginBottom: 8 }}>Find campus components</h1>
-        <p style={{ color: "var(--muted)", fontSize: 14, maxWidth: 500, margin: "0 auto" }}>
-          Buy, sell, and trade engineering project components with verified students on your campus.
+      <div style={{ textAlign: "center", marginBottom: 28 }}>
+        <h1 style={{ marginBottom: 8 }}>Find Campus Engineering Components</h1>
+        <p style={{ color: "var(--muted)", fontSize: 14, maxWidth: 540, margin: "0 auto" }}>
+          Buy, sell, and trade Arduino boards, sensors, and robotics kits with verified campus peers.
         </p>
       </div>
 
@@ -41,7 +54,7 @@ export function BrowsePage({ onRequestListing }) {
           <Search size={14} className="search-bar__icon" />
           <input
             className="input search-bar__input"
-            placeholder="Search components…"
+            placeholder="Search components (e.g. Arduino, ESP32, Servo, Sensor)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyUp={(e) => e.key === "Enter" && loadListings()}
@@ -89,16 +102,32 @@ export function BrowsePage({ onRequestListing }) {
         <div className="listing-grid"><Skeleton type="card" count={6} /></div>
       ) : listings.length === 0 ? (
         <div className="card">
-          <EmptyState icon="🔍" title="No components found" sub="Try a different search or category. Or be the first to list one!" />
+          <EmptyState
+            icon="🔍"
+            title="No matching components found"
+            sub="Can't find what you need? Send a broadcast availability inquiry to all sellers!"
+            action={
+              <button className="btn btn-primary" onClick={() => setInquiryModalQuery({ category, query: search })}>
+                <Radio size={14} /> Ask Availability Broadcast
+              </button>
+            }
+          />
         </div>
       ) : viewMode === "grid" ? (
         <div className="listing-grid">
           {listings.map((l) => (
-            <div key={l.id} className="card card-hover listing-card" onClick={() => l.status === "available" && onRequestListing(l)}>
-              <div className="listing-card__image-placeholder">
-                {CATEGORY_ICONS[l.category] || "📦"}
+            <div key={l.id} className="card card-hover listing-card" style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ position: "relative", height: "150px", overflow: "hidden", background: "var(--raised)" }}>
+                <img
+                  src={l.image_data || CATEGORY_IMAGES[l.category] || CATEGORY_IMAGES["Microcontrollers"]}
+                  alt={l.item_name}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+                <div style={{ position: "absolute", top: 8, right: 8 }}>
+                  <StatusDot status={l.status} />
+                </div>
               </div>
-              <div className="listing-card__body">
+              <div className="listing-card__body" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
                 <div className="listing-card__header">
                   <div className="listing-card__title">{l.item_name}</div>
                   {l.price === 0 ? (
@@ -107,17 +136,27 @@ export function BrowsePage({ onRequestListing }) {
                     <span className="listing-card__price">₹{l.price}</span>
                   )}
                 </div>
-                <div className="listing-card__meta">
+                <div className="listing-card__meta" style={{ marginBottom: 12 }}>
                   <Badge tone="muted">{l.category}</Badge>
-                  <span>{l.condition_notes}</span>
+                  <span style={{ fontSize: 11 }}>{l.condition_notes}</span>
                 </div>
-                <div className="listing-card__footer">
+
+                <div className="listing-card__footer" style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--trace)" }}>
                   <div className="listing-card__seller">
                     <Avatar name={l.seller_name} size="sm" />
-                    <span>{l.seller_name}</span>
-                    {l.seller_verified ? <Badge tone="green">✓</Badge> : null}
+                    <span style={{ fontSize: 12 }}>{l.seller_name}</span>
+                    {l.seller_verified ? <CheckCircle size={14} color="var(--signal)" /> : null}
                   </div>
-                  <StatusDot status={l.status} />
+                  
+                  {l.status === "available" && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => onRequestListing(l)}
+                      style={{ padding: "4px 10px", fontSize: 12 }}
+                    >
+                      Request
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -145,6 +184,14 @@ export function BrowsePage({ onRequestListing }) {
             </div>
           ))}
         </div>
+      )}
+
+      {inquiryModalQuery && (
+        <InquiryModal
+          initialCategory={inquiryModalQuery.category}
+          initialQuery={inquiryModalQuery.query}
+          onClose={() => setInquiryModalQuery(null)}
+        />
       )}
     </div>
   );

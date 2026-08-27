@@ -1,28 +1,29 @@
 /**
- * matchingService
- * ----------------
- * Owns the buyer-request -> seller-accept/decline flow discussed in planning:
- *   1. Buyer requests a listing -> seller is notified (no payment, no contact shared yet)
- *   2. Seller accepts (commits a delivery day) or declines
- *   3. If declined / no response inside RESPONSE_WINDOW_MS, request auto-expires
- *      and the listing reopens for the next buyer
- *   4. Only on accept does the buyer get the seller's contact info
- *   5. Buyer confirms delivery -> payment QR unlocks in the UI (handled client-side,
- *      this service just flips status so the UI knows to show it)
- *   6. If accepted but never confirmed delivered within NO_SHOW_WINDOW_MS,
- *      auto-mark as no_show and reopen the listing (no-show edge case)
+ * matchingService v2.0
+ * ---------------------
+ * Two flows:
  *
- * Concurrency / race-condition handling:
- *   SQLite transactions here guarantee only one buyer can hold an active
- *   request on a listing at a time. A second buyer requesting a
- *   'pending' listing is rejected at the DB layer, not just in the UI.
+ * FLOW A — Direct Request (existing):
+ *   Buyer sees a specific listing → requests it → seller notified → accept/decline
+ *
+ * FLOW B — Broadcast Inquiry (NEW v2.0):
+ *   Buyer doesn't see what they need → posts "I need X by [date]"
+ *   → ALL sellers with matching category/item get notified simultaneously
+ *   → First seller to respond "I have it" → match created → conversation enabled
+ *   → Other pending responses auto-declined
+ *   → 2-hour window; if no response → inquiry expires → buyer notified
  */
 const { db } = require("../db");
 const { v4: uuid } = require("uuid");
 const notificationService = require("./notificationService");
 
-const RESPONSE_WINDOW_MS = 2 * 60 * 60 * 1000; // 2 hours for seller to respond
-const NO_SHOW_WINDOW_MS = 3 * 24 * 60 * 60 * 1000; // 3 days after accept to confirm delivery
+const RESPONSE_WINDOW_MS = 2 * 60 * 60 * 1000;    // 2 hours seller response window
+const NO_SHOW_WINDOW_MS = 3 * 24 * 60 * 60 * 1000; // 3 days to confirm delivery
+const INQUIRY_WINDOW_MS = 2 * 60 * 60 * 1000;       // 2 hours for inquiry responses
+
+// =============================================
+// FLOW A: Direct Request
+// =============================================
 
 function createRequest(listingId, buyerId) {
   const tx = db.transaction(() => {
@@ -39,20 +40,20 @@ function createRequest(listingId, buyerId) {
     db.prepare(
       `INSERT INTO requests (id, listing_id, buyer_id, status) VALUES (?, ?, ?, 'notified')`
     ).run(id, listingId, buyerId);
-
     db.prepare(`UPDATE listings SET status = 'pending', updated_at = datetime('now') WHERE id = ?`).run(listingId);
-
     return id;
   });
 
   const requestId = tx();
   const request = getRequest(requestId);
   const seller = db.prepare("SELECT * FROM users WHERE id = ?").get(request.seller_id);
+  const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(buyerId);
 
   notificationService.notify(seller, {
     type: "new_request",
-    message: `${request.item_name}: a buyer wants this item. Accept or decline within 2 hours.`,
-    requestId,
+    title: "📦 New Request!",
+    message: `${buyer.name} wants your "${request.item_name}". Accept or decline within 2 hours.`,
+    data: { requestId, listingId, action: "go_to_inbox" },
   });
 
   return request;
@@ -64,7 +65,7 @@ function respondToRequest(requestId, sellerId, decision, deliveryDay) {
     if (!request) throw new HttpError(404, "Request not found");
 
     const listing = db.prepare("SELECT * FROM listings WHERE id = ?").get(request.listing_id);
-    if (listing.seller_id !== sellerId) throw new HttpError(403, "Only the seller can respond to this request.");
+    if (listing.seller_id !== sellerId) throw new HttpError(403, "Only the seller can respond.");
     if (request.status !== "notified") throw new HttpError(409, "This request has already been resolved.");
 
     if (decision === "accept") {
@@ -72,7 +73,6 @@ function respondToRequest(requestId, sellerId, decision, deliveryDay) {
       db.prepare(
         `UPDATE requests SET status = 'accepted', delivery_day = ?, accepted_at = datetime('now'), responded_at = datetime('now') WHERE id = ?`
       ).run(deliveryDay, requestId);
-      // listing stays 'pending' — contact now revealed to buyer, but slot isn't free until delivered/cancelled
     } else {
       db.prepare(`UPDATE requests SET status = 'declined', responded_at = datetime('now') WHERE id = ?`).run(requestId);
       db.prepare(`UPDATE listings SET status = 'available', updated_at = datetime('now') WHERE id = ?`).run(request.listing_id);
@@ -84,10 +84,20 @@ function respondToRequest(requestId, sellerId, decision, deliveryDay) {
 
   if (decision === "accept") {
     const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(updated.buyer_id);
+    const seller = db.prepare("SELECT * FROM users WHERE id = ?").get(updated.seller_id);
     notificationService.notify(buyer, {
       type: "request_accepted",
-      message: `${updated.item_name}: accepted for ${deliveryDay}. Seller contact is now visible in the app.`,
-      requestId,
+      title: "✅ Request Accepted!",
+      message: `${seller.name} accepted your request for "${updated.item_name}" — delivery on ${deliveryDay}. Chat is now open!`,
+      data: { requestId, action: "go_to_inbox" },
+    });
+  } else {
+    const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(updated.buyer_id);
+    notificationService.notify(buyer, {
+      type: "request_declined",
+      title: "❌ Request Declined",
+      message: `Your request for "${updated.item_name}" was declined. The item is available again for others.`,
+      data: { action: "go_to_browse" },
     });
   }
 
@@ -101,52 +111,246 @@ function confirmDelivered(requestId, buyerId) {
   if (request.status !== "accepted") throw new HttpError(409, "This request isn't in an accepted state.");
 
   db.prepare(`UPDATE requests SET status = 'delivered', delivered_confirmed_at = datetime('now') WHERE id = ?`).run(requestId);
-  db.prepare(`UPDATE listings SET status = 'claimed', updated_at = datetime('now') WHERE id = (SELECT listing_id FROM requests WHERE id = ?)`).run(requestId);
+  db.prepare(`UPDATE listings SET status = 'claimed', updated_at = datetime('now') WHERE id = ?`).run(request.listing_id);
 
-  // Record the platform fee owed by the seller — flat, small, batched (not charged mid-transaction)
-  const listing = db.prepare(`SELECT l.* FROM listings l JOIN requests r ON r.listing_id = l.id WHERE r.id = ?`).get(requestId);
-  const FLAT_FEE = 3; // ₹3 flat, absorbed by seller — see README revenue model notes
-  db.prepare(`INSERT INTO fee_ledger (id, request_id, seller_id, amount) VALUES (?, ?, ?, ?)`)
-    .run(uuid(), requestId, listing.seller_id, FLAT_FEE);
+  const listing = db.prepare("SELECT l.*, u.* FROM listings l JOIN users u ON u.id = l.seller_id WHERE l.id = ?").get(request.listing_id);
+  const FLAT_FEE = 3;
+  db.prepare(`INSERT INTO fee_ledger (id, request_id, seller_id, amount) VALUES (?, ?, ?, ?)`).run(uuid(), requestId, listing.seller_id, FLAT_FEE);
+
+  // Notify seller
+  const seller = db.prepare("SELECT * FROM users WHERE id = ?").get(listing.seller_id);
+  notificationService.notify(seller, {
+    type: "delivery_confirmed",
+    title: "🎉 Delivery Confirmed!",
+    message: `The buyer confirmed delivery of "${listing.item_name}". Transaction complete! Please leave a rating.`,
+    data: { requestId, action: "rate_buyer" },
+  });
 
   return getRequest(requestId);
 }
 
-/**
- * Sweep job — run on a schedule (see server.js cron section).
- * Handles two timeout edge cases in one pass:
- *  - seller never responded -> auto-decline, reopen listing
- *  - seller accepted but buyer never confirmed delivery -> mark no_show, reopen listing
- */
+// =============================================
+// FLOW B: Broadcast Inquiry (v2.0 NEW)
+// =============================================
+
+function createInquiry(buyerId, { itemQuery, category, neededByDate, maxBudget, notes }) {
+  if (!itemQuery || itemQuery.trim().length < 2) throw new HttpError(400, "Please describe what you're looking for.");
+
+  const id = uuid();
+  const expiresAt = new Date(Date.now() + INQUIRY_WINDOW_MS).toISOString();
+
+  db.prepare(
+    `INSERT INTO inquiries (id, buyer_id, item_query, category, needed_by_date, max_budget, notes, status, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)`
+  ).run(id, buyerId, itemQuery.trim(), category || "Any", neededByDate || null, maxBudget || 0, notes || "", expiresAt);
+
+  const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(buyerId);
+
+  // Find ALL sellers with matching available listings
+  let sellerQuery = `
+    SELECT DISTINCT u.*, l.item_name as matched_item, l.id as matched_listing_id
+    FROM users u JOIN listings l ON l.seller_id = u.id
+    WHERE l.status = 'available'
+      AND l.moderation_status != 'removed'
+      AND u.id != ?
+  `;
+  const params = [buyerId];
+
+  if (category && category !== "Any") {
+    sellerQuery += " AND l.category = ?";
+    params.push(category);
+  }
+
+  const matchingSellers = db.prepare(sellerQuery).all(...params);
+
+  // Filter by keyword relevance
+  const queryWords = itemQuery.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const relevantSellers = matchingSellers.filter(s => {
+    const itemWords = s.matched_item.toLowerCase();
+    return queryWords.length === 0 || queryWords.some(w => itemWords.includes(w));
+  });
+
+  // Also include ALL sellers in the category even without perfect keyword match
+  const allCategorySellers = category && category !== "Any"
+    ? matchingSellers.filter(s => !relevantSellers.find(r => r.id === s.id))
+    : [];
+
+  const notifyTargets = [...relevantSellers, ...allCategorySellers.slice(0, 10)];
+
+  // Broadcast to all matching sellers
+  let notifiedCount = 0;
+  for (const seller of notifyTargets) {
+    notificationService.notify(seller, {
+      type: "inquiry_broadcast",
+      title: "🔔 Someone needs what you have!",
+      message: `${buyer.name} is looking for "${itemQuery}"${neededByDate ? ` by ${neededByDate}` : ""}${maxBudget ? ` (budget: ₹${maxBudget})` : ""}. Can you help?`,
+      data: { inquiryId: id, action: "respond_to_inquiry" },
+    });
+    notifiedCount++;
+  }
+
+  // Notify buyer with count
+  notificationService.notify(buyer, {
+    type: "system",
+    title: "📢 Inquiry Broadcast!",
+    message: `Your inquiry for "${itemQuery}" was sent to ${notifiedCount} seller${notifiedCount !== 1 ? "s" : ""}. You'll be notified when someone responds. Expires in 2 hours.`,
+    data: { inquiryId: id },
+  });
+
+  return { id, notifiedCount };
+}
+
+function respondToInquiry(inquiryId, sellerId, { listingId, availableFrom, priceOffer, message }) {
+  const inquiry = db.prepare("SELECT * FROM inquiries WHERE id = ?").get(inquiryId);
+  if (!inquiry) throw new HttpError(404, "Inquiry not found.");
+  if (inquiry.status !== "open") throw new HttpError(409, "This inquiry has already been matched or expired.");
+  if (inquiry.buyer_id === sellerId) throw new HttpError(400, "You can't respond to your own inquiry.");
+
+  // Check if this seller already responded
+  const existing = db.prepare("SELECT id FROM inquiry_responses WHERE inquiry_id = ? AND seller_id = ?").get(inquiryId, sellerId);
+  if (existing) throw new HttpError(409, "You have already responded to this inquiry.");
+
+  const responseId = uuid();
+  db.prepare(
+    `INSERT INTO inquiry_responses (id, inquiry_id, seller_id, listing_id, available_from, price_offer, message, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`
+  ).run(responseId, inquiryId, sellerId, listingId || null, availableFrom || null, priceOffer || 0, message || "");
+
+  const seller = db.prepare("SELECT * FROM users WHERE id = ?").get(sellerId);
+  const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(inquiry.buyer_id);
+
+  // Notify buyer that a seller responded
+  notificationService.notify(buyer, {
+    type: "inquiry_response",
+    title: "🙋 Seller Available!",
+    message: `${seller.name} says they can help with "${inquiry.item_query}"${priceOffer ? ` for ₹${priceOffer}` : ""}. Tap to accept!`,
+    data: { inquiryId, responseId, action: "accept_inquiry_response" },
+  });
+
+  return { responseId, notifiedBuyer: true };
+}
+
+function acceptInquiryResponse(inquiryId, responseId, buyerId) {
+  const tx = db.transaction(() => {
+    const inquiry = db.prepare("SELECT * FROM inquiries WHERE id = ?").get(inquiryId);
+    if (!inquiry) throw new HttpError(404, "Inquiry not found.");
+    if (inquiry.buyer_id !== buyerId) throw new HttpError(403, "Only the buyer can accept a response.");
+    if (inquiry.status !== "open") throw new HttpError(409, "This inquiry has already been resolved.");
+
+    const response = db.prepare("SELECT * FROM inquiry_responses WHERE id = ?").get(responseId);
+    if (!response) throw new HttpError(404, "Response not found.");
+
+    // Mark inquiry as matched
+    db.prepare(`UPDATE inquiries SET status = 'matched', matched_response_id = ? WHERE id = ?`).run(responseId, inquiryId);
+    db.prepare(`UPDATE inquiry_responses SET status = 'accepted' WHERE id = ?`).run(responseId);
+
+    // Decline all other pending responses
+    db.prepare(
+      `UPDATE inquiry_responses SET status = 'declined' WHERE inquiry_id = ? AND id != ? AND status = 'pending'`
+    ).run(inquiryId, responseId);
+
+    return response;
+  });
+
+  const response = tx();
+  const inquiry = db.prepare("SELECT * FROM inquiries WHERE id = ?").get(inquiryId);
+  const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(buyerId);
+  const seller = db.prepare("SELECT * FROM users WHERE id = ?").get(response.seller_id);
+
+  // Notify seller they were accepted
+  notificationService.notify(seller, {
+    type: "inquiry_matched",
+    title: "🎉 You Got Matched!",
+    message: `${buyer.name} accepted your offer for "${inquiry.item_query}". Contact them to arrange the exchange!`,
+    data: { inquiryId, responseId, buyerId, action: "view_inquiry_match" },
+  });
+
+  // Notify declined sellers
+  const declinedResponses = db.prepare(
+    `SELECT ir.*, u.id as uid FROM inquiry_responses ir JOIN users u ON u.id = ir.seller_id WHERE ir.inquiry_id = ? AND ir.status = 'declined' AND ir.id != ?`
+  ).all(inquiryId, responseId);
+
+  for (const r of declinedResponses) {
+    const declinedSeller = db.prepare("SELECT * FROM users WHERE id = ?").get(r.seller_id);
+    if (declinedSeller) {
+      notificationService.notify(declinedSeller, {
+        type: "system",
+        title: "Inquiry Filled",
+        message: `The buyer found a match for "${inquiry.item_query}" from another seller. Thank you for offering!`,
+        data: { inquiryId },
+      });
+    }
+  }
+
+  return { matched: true, sellerId: response.seller_id, buyerId };
+}
+
+// =============================================
+// SWEEP JOBS
+// =============================================
+
 function sweepExpiredRequests() {
   const now = Date.now();
 
+  // Auto-expire requests where seller didn't respond
   const stuckNotified = db.prepare(`SELECT * FROM requests WHERE status = 'notified'`).all();
   for (const r of stuckNotified) {
     if (now - new Date(r.created_at + "Z").getTime() > RESPONSE_WINDOW_MS) {
       db.prepare(`UPDATE requests SET status = 'expired', responded_at = datetime('now') WHERE id = ?`).run(r.id);
       db.prepare(`UPDATE listings SET status = 'available', updated_at = datetime('now') WHERE id = ?`).run(r.listing_id);
+
+      // Notify buyer
+      const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(r.buyer_id);
+      const listing = db.prepare("SELECT * FROM listings WHERE id = ?").get(r.listing_id);
+      if (buyer && listing) {
+        notificationService.notify(buyer, {
+          type: "system",
+          title: "⏰ Request Expired",
+          message: `Your request for "${listing.item_name}" expired — the seller didn't respond in time. The item is available again.`,
+          data: { action: "go_to_browse" },
+        });
+      }
     }
   }
 
+  // Auto no-show
   const stuckAccepted = db.prepare(`SELECT * FROM requests WHERE status = 'accepted'`).all();
   for (const r of stuckAccepted) {
-    if (now - new Date(r.accepted_at + "Z").getTime() > NO_SHOW_WINDOW_MS) {
+    if (r.accepted_at && now - new Date(r.accepted_at + "Z").getTime() > NO_SHOW_WINDOW_MS) {
       db.prepare(`UPDATE requests SET status = 'no_show' WHERE id = ?`).run(r.id);
       db.prepare(`UPDATE listings SET status = 'available', updated_at = datetime('now') WHERE id = ?`).run(r.listing_id);
-      // Optionally: flag buyer's account after repeated no-shows — left as a follow-up rule, see roadmap.
+    }
+  }
+
+  // Auto-expire open inquiries
+  const expiredInquiries = db.prepare(
+    `SELECT * FROM inquiries WHERE status = 'open' AND expires_at < datetime('now')`
+  ).all();
+  for (const inq of expiredInquiries) {
+    db.prepare(`UPDATE inquiries SET status = 'expired' WHERE id = ?`).run(inq.id);
+    const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(inq.buyer_id);
+    if (buyer) {
+      notificationService.notify(buyer, {
+        type: "system",
+        title: "⏰ Inquiry Expired",
+        message: `No sellers responded to your inquiry for "${inq.item_query}" in time. Try posting a wishlist or browse listings.`,
+        data: { action: "go_to_browse" },
+      });
     }
   }
 }
 
+// =============================================
+// HELPERS
+// =============================================
+
 function getRequest(id) {
-  return db
-    .prepare(
-      `SELECT r.*, l.item_name, l.seller_id, l.price
-       FROM requests r JOIN listings l ON l.id = r.listing_id WHERE r.id = ?`
-    )
-    .get(id);
+  return db.prepare(
+    `SELECT r.*, l.item_name, l.seller_id, l.price
+     FROM requests r JOIN listings l ON l.id = r.listing_id WHERE r.id = ?`
+  ).get(id);
 }
+
 function getRequestRaw(id) {
   return db.prepare("SELECT * FROM requests WHERE id = ?").get(id);
 }
@@ -158,4 +362,8 @@ class HttpError extends Error {
   }
 }
 
-module.exports = { createRequest, respondToRequest, confirmDelivered, sweepExpiredRequests, HttpError };
+module.exports = {
+  createRequest, respondToRequest, confirmDelivered,
+  createInquiry, respondToInquiry, acceptInquiryResponse,
+  sweepExpiredRequests, HttpError,
+};

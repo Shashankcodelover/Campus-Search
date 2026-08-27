@@ -1,39 +1,65 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Inbox, Clock, TrendingUp, CheckCircle2 } from "lucide-react";
+import { Inbox, Clock, TrendingUp, CheckCircle2, QrCode, MessageSquare } from "lucide-react";
 import { api } from "../api";
 import { StatusDot } from "../components/common/StatusDot";
 import { Badge } from "../components/common/Badge";
 import { EmptyState } from "../components/common/EmptyState";
 
-export function SellerInbox() {
+export function SellerInbox({ onOpenPayment }) {
   const [requests, setRequests] = useState([]);
   const [allRequests, setAllRequests] = useState({ asBuyer: [], asSeller: [] });
+  const [loading, setLoading] = useState(true);
+
   const load = useCallback(async () => {
-    const data = await api.myRequests();
-    setAllRequests(data);
-    setRequests(data.asSeller.filter((r) => r.status === "notified"));
+    try {
+      const data = await api.myRequests();
+      setAllRequests(data);
+      setRequests(data.asSeller.filter((r) => r.status === "notified"));
+    } catch (e) {}
+    setLoading(false);
   }, []);
-  useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t); }, [load]);
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
+  }, [load]);
 
   const respond = async (id, decision) => {
-    const delivery_day = decision === "accept" ? prompt("What day can you deliver? (e.g. Wednesday)") : null;
+    const delivery_day = decision === "accept" ? prompt("What day can you deliver? (e.g. Wednesday 3 PM)") : null;
     if (decision === "accept" && !delivery_day) return;
-    await api.respondToRequest(id, decision, delivery_day);
-    load();
+    try {
+      await api.respondToRequest(id, decision, delivery_day);
+      load();
+    } catch (e) {
+      alert(e.message || "Failed to respond");
+    }
+  };
+
+  const handleConfirmDelivery = async (id) => {
+    if (!window.confirm("Confirm that you have received this item from the seller?")) return;
+    try {
+      await api.confirmDelivered(id);
+      if (onOpenPayment) onOpenPayment(id);
+      load();
+    } catch (e) {
+      alert(e.message || "Could not confirm delivery");
+    }
   };
 
   return (
     <div className="page-enter">
       <div className="section-header">
-        <h2 className="section-title"><Inbox size={22} /> My Requests</h2>
+        <h2 className="section-title"><Inbox size={22} color="var(--signal)" /> My Component Requests</h2>
       </div>
 
       <h4 style={{ color: "var(--amber)", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-        <Clock size={15} /> Pending Response ({requests.length})
+        <Clock size={15} /> Incoming Requests to Respond ({requests.length})
       </h4>
+
       {requests.length === 0 ? (
         <div className="card" style={{ marginBottom: 24 }}>
-          <EmptyState icon="📭" title="No pending requests" sub="When buyers request your listings, they'll appear here." />
+          <EmptyState icon="📭" title="No pending requests" sub="When buyers request your items, they will appear here for your approval." />
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
@@ -42,12 +68,12 @@ export function SellerInbox() {
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{r.item_name}</div>
                 <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-                  <Clock size={11} style={{ verticalAlign: "middle" }} /> {new Date(r.created_at).toLocaleString()}
+                  Requested: {new Date(r.created_at).toLocaleString()}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => respond(r.id, "accept")} className="btn btn-primary" style={{ padding: "8px 14px", fontSize: 12 }}>
-                  <CheckCircle2 size={13} /> Accept
+                  <CheckCircle2 size={13} /> Accept Request
                 </button>
                 <button onClick={() => respond(r.id, "decline")} className="btn btn-ghost" style={{ padding: "8px 14px", fontSize: 12 }}>Decline</button>
               </div>
@@ -56,8 +82,43 @@ export function SellerInbox() {
         </div>
       )}
 
+      {/* Active Accepted Requests (Buyer View) */}
+      {allRequests.asBuyer.filter((r) => r.status === "accepted" || r.status === "delivered").length > 0 && (
+        <div style={{ marginBottom: "28px" }}>
+          <h4 style={{ color: "var(--signal)", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+            <CheckCircle2 size={15} /> Active Outgoing Requests (As Buyer)
+          </h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {allRequests.asBuyer
+              .filter((r) => r.status === "accepted" || r.status === "delivered")
+              .map((r) => (
+                <div key={r.id} className="card" style={{ padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                  <div>
+                    <h4 style={{ fontSize: 15 }}>{r.item_name}</h4>
+                    <p style={{ fontSize: 12, color: "var(--muted)" }}>
+                      Delivery committed: <strong style={{ color: "var(--signal)" }}>{r.delivery_day || "Scheduled"}</strong>
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {r.status === "accepted" && (
+                      <button className="btn btn-primary" onClick={() => handleConfirmDelivery(r.id)}>
+                        <CheckCircle2 size={14} /> Confirm Delivery & Pay UPI
+                      </button>
+                    )}
+                    {r.status === "delivered" && (
+                      <button className="btn btn-secondary" onClick={() => onOpenPayment && onOpenPayment(r.id)}>
+                        <QrCode size={14} /> View UPI QR Code
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       <h4 style={{ color: "var(--muted)", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-        <TrendingUp size={15} /> History
+        <TrendingUp size={15} /> Request History
       </h4>
       <div className="card" style={{ overflow: "hidden" }}>
         {[...allRequests.asBuyer, ...allRequests.asSeller]
@@ -73,8 +134,7 @@ export function SellerInbox() {
               <StatusDot status={r.status === "delivered" ? "claimed" : r.status === "accepted" ? "pending" : "expired"} />
               <Badge tone={r.status === "delivered" ? "green" : r.status === "accepted" ? "amber" : "muted"}>{r.status}</Badge>
             </div>
-          ))
-        }
+          ))}
         {allRequests.asBuyer.length + allRequests.asSeller.length === 0 && (
           <EmptyState icon="📋" title="No history yet" sub="Your completed, declined, and expired requests will show here." />
         )}

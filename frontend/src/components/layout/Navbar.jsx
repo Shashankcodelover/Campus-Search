@@ -2,7 +2,7 @@ import React from "react";
 import { Cpu, Bell, Plus, LogOut } from "lucide-react";
 import { NotificationPanel } from "../notifications/NotificationPanel";
 
-export function Navbar({ tabs, activeTab, setTab, unreadCount, showNotifications, setShowNotifications, onOpenListModal, onLogout }) {
+export function Navbar({ tabs, activeTab, setTab, unreadCount, showNotifications, setShowNotifications, onOpenListModal, onLogout, themeToggle }) {
   return (
     <>
       <nav className="navbar">
@@ -10,7 +10,7 @@ export function Navbar({ tabs, activeTab, setTab, unreadCount, showNotifications
           <div className="navbar__brand" onClick={() => setTab("browse")}>
             <div className="navbar__logo"><Cpu size={16} color="#060a08" /></div>
             <span className="navbar__title">CampusSearch</span>
-            <span className="navbar__version">v1.1</span>
+            <span className="navbar__version">v2.0</span>
           </div>
 
           <div className="navbar__tabs">
@@ -23,6 +23,8 @@ export function Navbar({ tabs, activeTab, setTab, unreadCount, showNotifications
           </div>
 
           <div className="navbar__actions">
+            {themeToggle}
+
             <div className="notification-bell" style={{ position: "relative" }}>
               <button className="btn-icon" onClick={() => setShowNotifications(!showNotifications)}>
                 <Bell size={16} />
@@ -40,16 +42,6 @@ export function Navbar({ tabs, activeTab, setTab, unreadCount, showNotifications
           </div>
         </div>
       </nav>
-
-      <div className="navbar__tabs--mobile">
-        {tabs.slice(0, 5).map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={`navbar__tab ${activeTab === t.id ? "navbar__tab--active" : ""}`}>
-            {t.icon}
-            <span>{t.label}</span>
-          </button>
-        ))}
-      </div>
     </>
   );
 }

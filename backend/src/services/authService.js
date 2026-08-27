@@ -1,51 +1,93 @@
 /**
- * authService
- * -----------
- * Trust model from planning: identity is borrowed from the campus itself.
- * Registration is restricted to the campus email domain (set via CAMPUS_EMAIL_DOMAIN),
- * which is the cheapest reliable proxy for "this is a real student" without
- * needing a full ID-verification pipeline in v1.
+ * authService v2.0
+ * -----------------
+ * Identity model: any email allowed, verified via USN + College ID photo.
+ * Admin reviews pending accounts in the Admin Panel and approves/rejects.
+ * On approval, user gets an in-app notification → verified badge appears.
  */
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { v4: uuid } = require("uuid");
 const { db } = require("../db");
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
-const CAMPUS_EMAIL_DOMAIN = process.env.CAMPUS_EMAIL_DOMAIN || "college.edu"; // set in .env per deployment
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production-64chars";
 
-async function register({ name, email, phone, department, year, password }) {
-  if (!email.toLowerCase().endsWith(`@${CAMPUS_EMAIL_DOMAIN}`)) {
-    const err = new Error(`Registration requires a @${CAMPUS_EMAIL_DOMAIN} email address.`);
-    err.status = 400;
-    throw err;
+async function register({ name, email, phone, department, year, usn, id_photo_data, password }) {
+  if (!email || !email.includes("@")) {
+    throw httpError(400, "A valid email address is required.");
   }
+  if (!usn || usn.trim().length < 3) {
+    throw httpError(400, "USN / Roll number is required for identity verification.");
+  }
+  if (!id_photo_data) {
+    throw httpError(400, "A college ID photo is required for identity verification.");
+  }
+  if (!password || password.length < 8) {
+    throw httpError(400, "Password must be at least 8 characters.");
+  }
+
   const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email.toLowerCase());
-  if (existing) {
-    const err = new Error("An account with this email already exists.");
-    err.status = 409;
-    throw err;
-  }
+  if (existing) throw httpError(409, "An account with this email already exists.");
+
+  const existingUsn = db.prepare("SELECT id FROM users WHERE usn = ?").get(usn.trim().toUpperCase());
+  if (existingUsn) throw httpError(409, "This USN/Roll number is already registered.");
 
   const password_hash = await bcrypt.hash(password, 10);
   const id = uuid();
-  db.prepare(
-    `INSERT INTO users (id, name, email, phone, department, year, password_hash, verified)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1)` // verified=1 because domain check already gates entry; swap for email-link verification if needed
-  ).run(id, name, email.toLowerCase(), phone, department, year, password_hash);
 
-  return issueToken(id);
+  db.prepare(
+    `INSERT INTO users (id, name, email, phone, department, year, usn, id_photo_data, password_hash, verified, admin_verified)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`
+  ).run(
+    id,
+    name.trim(),
+    email.toLowerCase().trim(),
+    phone || "",
+    department || "",
+    year || "",
+    usn.trim().toUpperCase(),
+    id_photo_data,
+    password_hash
+  );
+
+  // Notify admins about new pending verification
+  const admins = db.prepare("SELECT * FROM users WHERE role = 'admin'").all();
+  const notificationService = require("./notificationService");
+  for (const admin of admins) {
+    notificationService.notify(admin, {
+      type: "system",
+      title: "New ID Verification Pending",
+      message: `${name} (${usn.trim().toUpperCase()}) has registered and is awaiting identity verification.`,
+      data: { userId: id, action: "verify_user" },
+    });
+  }
+
+  // Return token immediately — user can browse but limited until verified
+  return { token: issueToken(id), requiresVerification: true };
 }
 
 async function login(email, password) {
-  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email.toLowerCase());
+  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email.toLowerCase().trim());
   if (!user) throw httpError(401, "Invalid email or password.");
-  if (user.suspended) throw httpError(403, "This account has been suspended by a moderator.");
+  if (user.suspended) throw httpError(403, "This account has been suspended. Contact admin.");
 
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) throw httpError(401, "Invalid email or password.");
 
-  return issueToken(user.id);
+  return { token: issueToken(user.id), requiresVerification: !user.admin_verified };
+}
+
+async function changePassword(userId, currentPassword, newPassword) {
+  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
+  if (!user) throw httpError(404, "User not found.");
+
+  const ok = await bcrypt.compare(currentPassword, user.password_hash);
+  if (!ok) throw httpError(401, "Current password is incorrect.");
+  if (newPassword.length < 8) throw httpError(400, "New password must be at least 8 characters.");
+
+  const password_hash = await bcrypt.hash(newPassword, 10);
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(password_hash, userId);
+  return { ok: true };
 }
 
 function issueToken(userId) {
@@ -62,4 +104,4 @@ function httpError(status, message) {
   return e;
 }
 
-module.exports = { register, login, verifyToken, JWT_SECRET };
+module.exports = { register, login, changePassword, verifyToken, JWT_SECRET };
