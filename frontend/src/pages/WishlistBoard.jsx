@@ -45,7 +45,7 @@ export function WishlistBoard() {
           <h4 style={{ marginBottom: 14 }}>What are you looking for?</h4>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <input className="input" placeholder="Item name *" value={form.item_name} onChange={(e) => setForm(f => ({ ...f, item_name: e.target.value }))} />
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <select className="input" value={form.category} onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))}>
                 <option>Any</option>
                 {CATEGORIES.map((c) => <option key={c}>{c}</option>)}

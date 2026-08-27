@@ -80,7 +80,7 @@ export function BrowsePage({ onRequestListing }) {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 20, overflowX: "auto", paddingBottom: 4 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 20 }}>
         <button
           className={`btn ${category === "All" ? "btn-primary" : "btn-ghost"}`}
           style={{ padding: "6px 14px", fontSize: 12, flexShrink: 0 }}

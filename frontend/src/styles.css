@@ -1153,28 +1153,53 @@ select.input {
   animation: slideUp 0.35s ease-out;
 }
 
+.mobile-only { display: none !important; }
+.desktop-only { display: inline-flex !important; }
+
+@keyframes slideLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 /* ========== RESPONSIVE ========== */
 @media (max-width: 768px) {
   .navbar__tabs { display: none; }
-  .navbar__tabs--mobile {
-    display: flex !important;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 50;
-    background: rgba(13, 19, 16, 0.95);
-    backdrop-filter: blur(20px);
-    border-top: 1px solid var(--glass-border);
-    padding: 6px 8px;
-    justify-content: space-around;
-    gap: 2px;
+  .desktop-only { display: none !important; }
+  .mobile-only { display: inline-flex !important; }
+
+  /* Mobile Vertical Sidebar Menu */
+  .mobile-menu-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5); z-index: 1000;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease-out;
   }
-  .navbar__tabs--mobile .navbar__tab {
-    flex-direction: column;
-    gap: 2px;
-    font-size: 10px;
-    padding: 6px 8px;
+  .mobile-menu-panel {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: 280px; max-width: 85vw;
+    background: var(--bg-elevated);
+    display: flex; flex-direction: column;
+    animation: slideLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .mobile-menu-header {
+    padding: 20px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--trace);
+  }
+  .mobile-menu-content {
+    flex: 1; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .mobile-menu-item {
+    display: flex; align-items: center; padding: 14px 16px;
+    border-radius: var(--radius-sm); border: none; background: transparent;
+    color: var(--text); font-size: 15px; font-weight: 500; cursor: pointer;
+    transition: background 0.2s; text-align: left;
+  }
+  .mobile-menu-item:hover, .mobile-menu-item--active {
+    background: var(--raised);
+  }
+  .mobile-menu-item--active {
+    color: var(--signal);
   }
 
   h1 { font-size: 24px !important; }

@@ -107,20 +107,6 @@ export default function App() {
         {tab === "admin" && <AdminPanel />}
       </div>
 
-      {/* Mobile Bottom Navigation Bar */}
-      <div className="navbar__tabs--mobile">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            className={`navbar__tab ${tab === t.id ? "navbar__tab--active" : ""}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.icon}
-            <span>{t.label}</span>
-          </button>
-        ))}
-      </div>
-
       {requestListing && <RequestModal listing={requestListing} onClose={() => setRequestListing(null)} onRefresh={() => setTab("inbox")} />}
       {paymentRequestId && <PaymentModal requestId={paymentRequestId} onClose={() => setPaymentRequestId(null)} onPaymentConfirmed={() => setTab("inbox")} />}
       {listModal && <ListItemModal onClose={() => setListModal(false)} onCreated={() => { setListModal(false); setTab("browse"); }} />}
