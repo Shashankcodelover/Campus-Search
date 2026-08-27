@@ -49,6 +49,12 @@ export default function App() {
     return () => conn?.close();
   }, [authed]);
 
+  useEffect(() => {
+    const handleOpenPayment = (e) => setPaymentRequestId(e.detail);
+    window.addEventListener("open_payment", handleOpenPayment);
+    return () => window.removeEventListener("open_payment", handleOpenPayment);
+  }, []);
+
   if (!authed) return <AuthScreen onAuthed={() => setAuthed(true)} />;
 
   const logout = () => { clearToken(); setAuthed(false); };

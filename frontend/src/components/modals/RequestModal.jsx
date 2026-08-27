@@ -108,7 +108,7 @@ export function RequestModal({ listing, onClose, onRefresh }) {
               active={request?.status === "notified"}
               icon={<CheckCircle2 size={15} />}
               label={request?.status === "accepted" ? "Seller accepted" : request?.status === "declined" ? "Seller declined" : "Waiting for seller response"}
-              sub={request?.status === "accepted" ? `Committed to ${request.delivery_day}` : request?.status === "declined" ? "Try another seller" : "Usually responds within 2 hours"}
+              sub={request?.status === "accepted" ? `Committed to ${request.delivery_day}` : request?.status === "declined" ? "Try another seller" : "Usually responds within 24 hours"}
             />
             <StepRow done={!!contact} active={request?.status === "accepted" && !contact} icon={<Phone size={15} />} label="Contact revealed" sub={contact ? "Coordinate pickup" : "Unlocks once accepted"} />
           </div>
@@ -134,10 +134,16 @@ export function RequestModal({ listing, onClose, onRefresh }) {
             </div>
 
             <button
-              onClick={async () => { await api.confirmDelivered(request.id); close(); }}
+              onClick={async () => { 
+                await api.confirmDelivered(request.id); 
+                onClose(); // close the request modal
+                // If there's a global way to open payment, or we can just tell them to check their inbox.
+                // Actually, let's just trigger a custom event or let the user go to inbox.
+                window.dispatchEvent(new CustomEvent('open_payment', { detail: request.id }));
+              }}
               className="btn btn-ghost" style={{ width: "100%", marginTop: 12 }}
             >
-              <CheckCircle2 size={14} /> I've received the item
+              <CheckCircle2 size={14} /> I've received the item & Pay
             </button>
           </div>
         )}

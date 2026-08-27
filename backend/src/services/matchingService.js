@@ -17,9 +17,9 @@ const { db } = require("../db");
 const { v4: uuid } = require("uuid");
 const notificationService = require("./notificationService");
 
-const RESPONSE_WINDOW_MS = 2 * 60 * 60 * 1000;    // 2 hours seller response window
+const RESPONSE_WINDOW_MS = 24 * 60 * 60 * 1000;    // 24 hours seller response window
 const NO_SHOW_WINDOW_MS = 3 * 24 * 60 * 60 * 1000; // 3 days to confirm delivery
-const INQUIRY_WINDOW_MS = 2 * 60 * 60 * 1000;       // 2 hours for inquiry responses
+const INQUIRY_WINDOW_MS = 24 * 60 * 60 * 1000;       // 24 hours for inquiry responses
 
 // =============================================
 // FLOW A: Direct Request
@@ -56,7 +56,7 @@ function createRequest(listingId, buyerId, quantity = 1) {
   notificationService.notify(seller, {
     type: "new_request",
     title: "📦 New Request!",
-    message: `${buyer.name} wants your "${request.item_name}". Accept or decline within 2 hours.`,
+    message: `${buyer.name} wants your "${request.item_name}". Accept or decline within 24 hours.`,
     data: { requestId, listingId, action: "go_to_inbox" },
   });
 
@@ -198,11 +198,10 @@ function createInquiry(buyerId, { itemQuery, category, neededByDate, maxBudget, 
     notifiedCount++;
   }
 
-  // Notify buyer with count
   notificationService.notify(buyer, {
     type: "system",
     title: "📢 Inquiry Broadcast!",
-    message: `Your inquiry for "${itemQuery}" was sent to ${notifiedCount} seller${notifiedCount !== 1 ? "s" : ""}. You'll be notified when someone responds. Expires in 2 hours.`,
+    message: `Your inquiry for "${itemQuery}" was sent to ${notifiedCount} seller${notifiedCount !== 1 ? "s" : ""}. You'll be notified when someone responds. Expires in 24 hours.`,
     data: { inquiryId: id },
   });
 
@@ -344,6 +343,23 @@ function sweepExpiredRequests() {
         title: "⏰ Inquiry Expired",
         message: `No sellers responded to your inquiry for "${inq.item_query}" in time. Try posting a wishlist or browse listings.`,
         data: { action: "go_to_browse" },
+      });
+    }
+  }
+
+  // Auto-expire listings that have passed their 60-day lifetime
+  const expiredListings = db.prepare(
+    `SELECT * FROM listings WHERE status = 'available' AND expires_at < datetime('now')`
+  ).all();
+  for (const list of expiredListings) {
+    db.prepare(`UPDATE listings SET status = 'expired', updated_at = datetime('now') WHERE id = ?`).run(list.id);
+    const seller = db.prepare("SELECT * FROM users WHERE id = ?").get(list.seller_id);
+    if (seller) {
+      notificationService.notify(seller, {
+        type: "system",
+        title: "⌛ Listing Expired",
+        message: `Your listing "${list.item_name}" has expired after 60 days. You can renew it from your profile if it's still available.`,
+        data: { listingId: list.id },
       });
     }
   }
