@@ -35,8 +35,8 @@ export function AuthScreen({ onAuthed }) {
     try {
       if (mode === "register") {
         if (!form.usn.trim()) throw new Error("USN / Roll number is required.");
-        if (!form.id_photo_data) throw new Error("Please upload a picture of your College ID card.");
       }
+
 
       const res = mode === "login"
         ? await api.login({ email: form.email, password: form.password })
@@ -104,8 +104,9 @@ export function AuthScreen({ onAuthed }) {
                   <div>
                     <Camera size={24} color="var(--muted)" style={{ marginBottom: "6px" }} />
                     <p style={{ fontSize: "12px", color: "var(--muted)", fontWeight: "600" }}>
-                      Upload College ID Card / Student Card Photo *
+                      Upload College ID Card Photo (Optional)
                     </p>
+
                     <span style={{ fontSize: "11px", color: "var(--muted-dim)" }}>
                       Required for identity verification by campus admin
                     </span>

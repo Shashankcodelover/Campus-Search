@@ -19,12 +19,10 @@ async function register({ name, email, phone, department, year, usn, id_photo_da
   if (!usn || usn.trim().length < 3) {
     throw httpError(400, "USN / Roll number is required for identity verification.");
   }
-  if (!id_photo_data) {
-    throw httpError(400, "A college ID photo is required for identity verification.");
-  }
   if (!password || password.length < 8) {
     throw httpError(400, "Password must be at least 8 characters.");
   }
+
 
   const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email.toLowerCase());
   if (existing) throw httpError(409, "An account with this email already exists.");
