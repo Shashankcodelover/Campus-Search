@@ -4,7 +4,10 @@
  *          Notifications (+ SSE), Notion, Wishlists, Profiles, Messages,
  *          Inquiries (Broadcast availability flow), Payments (UPI QR).
  */
-const BASE = "/api";
+const BASE = import.meta.env.VITE_API_URL
+  ? (import.meta.env.VITE_API_URL.endsWith("/api") ? import.meta.env.VITE_API_URL : `${import.meta.env.VITE_API_URL}/api`)
+  : "/api";
+
 
 function authHeaders() {
   const token = localStorage.getItem("cs_token");
