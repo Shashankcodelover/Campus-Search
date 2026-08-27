@@ -14,6 +14,7 @@ import { NotionHub } from "./pages/NotionHub";
 import { ProfilePage } from "./pages/ProfilePage";
 import { AdminPanel } from "./pages/AdminPanel";
 import { LandingPage } from "./pages/LandingPage";
+import { ToastContainer } from "./components/notifications/ToastContainer";
 
 export default function App() {
   const [authed, setAuthed] = useState(hasToken());
@@ -24,6 +25,7 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadBreakdown, setUnreadBreakdown] = useState({});
+  const [latestToast, setLatestToast] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem("cs_theme") || "dark");
 
   useEffect(() => {
@@ -54,6 +56,8 @@ export default function App() {
       if (event.type === "notification_count") {
         setUnreadCount(event.count);
         if (event.breakdown) setUnreadBreakdown(event.breakdown);
+      } else if (event.type === "notification") {
+        setLatestToast(event.notification);
       }
     });
     return () => conn?.close();
@@ -125,6 +129,7 @@ export default function App() {
       {requestListing && <RequestModal listing={requestListing} onClose={() => setRequestListing(null)} onRefresh={() => setTab("inbox")} />}
       {paymentRequestId && <PaymentModal requestId={paymentRequestId} onClose={() => setPaymentRequestId(null)} onPaymentConfirmed={() => setTab("inbox")} />}
       {listModal && <ListItemModal onClose={() => setListModal(false)} onCreated={() => { setListModal(false); setTab("browse"); }} />}
+      <ToastContainer event={latestToast} />
     </div>
   );
 }
