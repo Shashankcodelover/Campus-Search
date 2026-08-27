@@ -47,9 +47,12 @@ app.use("/api/messages", require("./routes/messages"));
 app.use("/api/inquiries", require("./routes/inquiries"));
 app.use("/api/payments", require("./routes/payments"));
 
+app.get("/", (req, res) => res.json({ ok: true, name: "CampusSearch API", version: "2.0.0", dbReady }));
+app.get("/health", (req, res) => res.json({ ok: true, version: "2.0.0", dbReady }));
 app.get("/api/health", (req, res) => res.json({ ok: true, version: "2.0.0", dbReady }));
 
 app.use((err, req, res, next) => {
+
   console.error(err);
   res.status(err.status || 500).json({ error: err.message || "Something went wrong." });
 });
