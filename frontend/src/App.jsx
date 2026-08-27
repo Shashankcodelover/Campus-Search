@@ -13,6 +13,7 @@ import { WishlistBoard } from "./pages/WishlistBoard";
 import { NotionHub } from "./pages/NotionHub";
 import { ProfilePage } from "./pages/ProfilePage";
 import { AdminPanel } from "./pages/AdminPanel";
+import { LandingPage } from "./pages/LandingPage";
 
 export default function App() {
   const [authed, setAuthed] = useState(hasToken());
@@ -55,7 +56,14 @@ export default function App() {
     return () => window.removeEventListener("open_payment", handleOpenPayment);
   }, []);
 
-  if (!authed) return <AuthScreen onAuthed={() => setAuthed(true)} />;
+  const [showLanding, setShowLanding] = useState(!hasToken());
+
+  if (!authed) {
+    if (showLanding) {
+      return <LandingPage onGetStarted={() => setShowLanding(false)} />;
+    }
+    return <AuthScreen onAuthed={() => setAuthed(true)} />;
+  }
 
   const logout = () => { clearToken(); setAuthed(false); };
   const toggleTheme = () => setTheme(t => t === "dark" ? "light" : "dark");
