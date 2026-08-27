@@ -460,11 +460,24 @@ select.input {
   font-family: "Inter", sans-serif;
   white-space: nowrap;
 }
-.navbar__tab:hover { color: var(--text-secondary); }
+.navbar__tab:hover { color: var(--signal); }
 .navbar__tab--active {
   background: var(--raised);
   color: var(--signal);
   box-shadow: var(--shadow-sm);
+}
+
+.tab-badge {
+  position: absolute;
+  top: -2px;
+  right: -8px;
+  background: var(--red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 10px;
+  line-height: 1;
 }
 
 .navbar__actions {
@@ -1162,6 +1175,19 @@ select.input {
 }
 
 /* ========== RESPONSIVE ========== */
+@media (max-width: 1024px) {
+  .notification-panel {
+    position: fixed !important;
+    top: 60px !important;
+    left: 16px !important;
+    right: 16px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: calc(100vh - 80px) !important;
+    z-index: 2000;
+  }
+}
+
 @media (max-width: 768px) {
   .navbar__tabs { display: none; }
   .desktop-only { display: none !important; }

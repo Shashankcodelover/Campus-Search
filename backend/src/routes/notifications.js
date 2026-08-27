@@ -19,7 +19,9 @@ router.get("/", requireAuth, (req, res) => {
 
 // GET /api/notifications/unread-count
 router.get("/unread-count", requireAuth, (req, res) => {
-  res.json({ count: notificationService.getUnreadCount(req.user.id) });
+  const count = notificationService.getUnreadCount(req.user.id);
+  const breakdown = notificationService.getUnreadBreakdown(req.user.id);
+  res.json({ count, breakdown });
 });
 
 // PATCH /api/notifications/:id/read — mark as read (or "all")

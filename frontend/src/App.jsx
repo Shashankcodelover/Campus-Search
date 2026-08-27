@@ -23,6 +23,7 @@ export default function App() {
   const [listModal, setListModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadBreakdown, setUnreadBreakdown] = useState({});
   const [theme, setTheme] = useState(localStorage.getItem("cs_theme") || "dark");
 
   useEffect(() => {
@@ -42,9 +43,17 @@ export default function App() {
   // Real-time notification polling
   useEffect(() => {
     if (!authed) return;
+    
+    // Initial fetch
+    api.request("/api/notifications/unread-count").then(res => {
+      setUnreadCount(res.count);
+      setUnreadBreakdown(res.breakdown || {});
+    });
+
     const conn = connectSSE((event) => {
       if (event.type === "notification_count") {
         setUnreadCount(event.count);
+        if (event.breakdown) setUnreadBreakdown(event.breakdown);
       }
     });
     return () => conn?.close();
@@ -70,8 +79,14 @@ export default function App() {
 
   const tabs = [
     { id: "browse", label: "Browse", icon: <LayoutGrid size={14} /> },
-    { id: "inquiries", label: "Inquiries", icon: <Radio size={14} /> },
-    { id: "inbox", label: "Requests", icon: <Inbox size={14} /> },
+    { 
+      id: "inquiries", label: "Inquiries", icon: <Radio size={14} />,
+      badge: (unreadBreakdown["inquiry_broadcast"] || 0) + (unreadBreakdown["inquiry_response"] || 0)
+    },
+    { 
+      id: "inbox", label: "Requests", icon: <Inbox size={14} />,
+      badge: (unreadBreakdown["new_request"] || 0) + (unreadBreakdown["request_accepted"] || 0) + (unreadBreakdown["new_message"] || 0)
+    },
     { id: "wishlist", label: "Wanted", icon: <Heart size={14} /> },
     { id: "notion", label: "Docs", icon: <BookOpen size={14} /> },
     { id: "profile", label: "Profile", icon: <User size={14} /> },

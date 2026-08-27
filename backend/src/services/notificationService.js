@@ -45,12 +45,19 @@ async function notify(user, payload) {
   const notification = persistNotification(user.id, payload);
 
   // Always push via SSE (instant in-app delivery)
+  const breakdown = getUnreadBreakdown(user.id);
+  const count = getUnreadCount(user.id);
+  
   sseService.send(user.id, {
     type: "notification",
     notification,
   });
+  sseService.send(user.id, {
+    type: "notification_count",
+    count,
+    breakdown,
+  });
 
-  // Also log via configured provider
   const provider = process.env.NOTIFY_PROVIDER || "console";
   if (provider === "twilio") return sendViaTwilio(user, payload);
   return sendViaConsole(user, payload);
@@ -81,4 +88,11 @@ function getUnreadCount(userId) {
   return db.prepare(`SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0`).get(userId).count;
 }
 
-module.exports = { notify, getNotifications, markRead, getUnreadCount };
+function getUnreadBreakdown(userId) {
+  const rows = db.prepare(`SELECT type, COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0 GROUP BY type`).all(userId);
+  const breakdown = {};
+  for (const r of rows) breakdown[r.type] = r.count;
+  return breakdown;
+}
+
+module.exports = { notify, getNotifications, markRead, getUnreadCount, getUnreadBreakdown };

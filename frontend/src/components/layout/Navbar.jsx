@@ -18,8 +18,11 @@ export function Navbar({ tabs, activeTab, setTab, unreadCount, showNotifications
           <div className="navbar__tabs">
             {tabs.map((t) => (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className={`navbar__tab ${activeTab === t.id ? "navbar__tab--active" : ""}`}>
+                className={`navbar__tab ${activeTab === t.id ? "navbar__tab--active" : ""}`}
+                style={{ position: "relative" }}
+              >
                 {t.icon} {t.label}
+                {t.badge > 0 && <span className="tab-badge">{t.badge > 9 ? "9+" : t.badge}</span>}
               </button>
             ))}
           </div>
@@ -65,9 +68,13 @@ export function Navbar({ tabs, activeTab, setTab, unreadCount, showNotifications
                   key={t.id} 
                   className={`mobile-menu-item ${activeTab === t.id ? "mobile-menu-item--active" : ""}`}
                   onClick={() => { setTab(t.id); setMobileMenuOpen(false); }}
+                  style={{ display: "flex", justifyContent: "space-between" }}
                 >
-                  <span style={{ marginRight: 12, color: "var(--signal)" }}>{t.icon}</span> 
-                  {t.label}
+                  <div>
+                    <span style={{ marginRight: 12, color: "var(--signal)" }}>{t.icon}</span> 
+                    {t.label}
+                  </div>
+                  {t.badge > 0 && <span className="tab-badge" style={{ position: "static", transform: "none" }}>{t.badge > 9 ? "9+" : t.badge}</span>}
                 </button>
               ))}
             </div>
