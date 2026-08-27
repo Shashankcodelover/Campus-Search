@@ -77,6 +77,15 @@ export function ProfilePage() {
               </div>
             ))}
           </div>
+          <div style={{ marginTop: 16 }}>
+            <button 
+              className="btn btn-ghost" 
+              style={{ color: "var(--red)", fontSize: 13, padding: "6px 12px" }}
+              onClick={() => window.dispatchEvent(new Event("auth_error"))}
+            >
+              Log Out
+            </button>
+          </div>
         </div>
       </div>
 
