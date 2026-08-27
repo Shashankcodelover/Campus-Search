@@ -84,6 +84,7 @@ export const api = {
   // ---- Notifications ----
   getNotifications: (unreadOnly = false) =>
     request(`/notifications${unreadOnly ? "?unread=true" : ""}`),
+  markNotificationRead: (id) => request(`/notifications/${id}/read`, { method: "PATCH" }),
   getUnreadCount: () => request("/notifications/unread-count"),
   markRead: (id) => request(`/notifications/${id}/read`, { method: "PATCH" }),
   markAllRead: () => request("/notifications/all/read", { method: "PATCH" }),

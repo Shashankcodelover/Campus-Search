@@ -47,10 +47,10 @@ export default function App() {
     if (!authed) return;
     
     // Initial fetch
-    api.request("/api/notifications/unread-count").then(res => {
+    api.getUnreadCount().then(res => {
       setUnreadCount(res.count);
       setUnreadBreakdown(res.breakdown || {});
-    });
+    }).catch(console.error);
 
     const conn = connectSSE((event) => {
       if (event.type === "notification_count") {
