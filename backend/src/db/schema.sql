@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS users (
   year TEXT,
   usn TEXT,                             -- v2.0: University/Roll number for identity
   id_photo_data TEXT,                   -- v2.0: base64 college ID photo for admin verification
+  upi_vpa TEXT DEFAULT '',              -- v2.0: custom seller UPI VPA ID (e.g. name@upi)
+  qr_image_data TEXT DEFAULT '',        -- v2.0: custom seller UPI QR image upload
   role TEXT NOT NULL DEFAULT 'student', -- student | moderator | admin
   password_hash TEXT NOT NULL,
   verified INTEGER NOT NULL DEFAULT 0,  -- 1 = admin-approved identity
@@ -37,6 +39,7 @@ CREATE TABLE IF NOT EXISTS listings (
   condition_notes TEXT,
   description TEXT,
   price INTEGER NOT NULL DEFAULT 0,
+  quantity INTEGER NOT NULL DEFAULT 1,  -- v2.0: stock inventory count
   listing_type TEXT NOT NULL DEFAULT 'sale', -- sale | rent
   return_by TEXT,
   parent_kit_id TEXT REFERENCES listings(id),
@@ -48,6 +51,7 @@ CREATE TABLE IF NOT EXISTS listings (
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   expires_at TEXT
 );
+
 
 -- ============================
 -- REQUESTS (direct matching)

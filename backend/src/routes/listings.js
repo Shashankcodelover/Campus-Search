@@ -76,16 +76,18 @@ router.get("/", (req, res) => {
 });
 
 router.post("/", requireAuth, (req, res) => {
-  const { item_name, category, condition_notes, description, price, listing_type, return_by, parent_kit_id, image_data } = req.body;
+  const { item_name, category, condition_notes, description, price, quantity, listing_type, return_by, parent_kit_id, image_data } = req.body;
   if (!item_name || !category) return res.status(400).json({ error: "item_name and category are required." });
 
   const id = uuid();
   const expiresAt = new Date(Date.now() + LISTING_LIFETIME_DAYS * 86400000).toISOString();
+  const qty = parseInt(quantity, 10) > 0 ? parseInt(quantity, 10) : 1;
 
   db.prepare(
-    `INSERT INTO listings (id, seller_id, item_name, category, condition_notes, description, price, listing_type, return_by, parent_kit_id, image_data, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, req.user.id, item_name, category, condition_notes || "", description || "", price || 0, listing_type || "sale", return_by || null, parent_kit_id || null, image_data || null, expiresAt);
+    `INSERT INTO listings (id, seller_id, item_name, category, condition_notes, description, price, quantity, listing_type, return_by, parent_kit_id, image_data, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, req.user.id, item_name, category, condition_notes || "", description || "", price || 0, qty, listing_type || "sale", return_by || null, parent_kit_id || null, image_data || null, expiresAt);
+
 
   const listing = db.prepare("SELECT * FROM listings WHERE id = ?").get(id);
   const flags = moderationService.screenListing(listing, req.user);

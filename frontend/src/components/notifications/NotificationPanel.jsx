@@ -45,11 +45,12 @@ export function NotificationPanel({ onClose }) {
           <div key={n.id} className={`notification-item ${!n.read ? "notification-item--unread" : ""}`}>
             {!n.read && <div className="notification-item__dot" />}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600 }}>{n.title}</div>
-              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.message}</div>
+              <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600, color: "var(--text)" }}>{n.title}</div>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4, lineClamp: 3, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word" }}>{n.message}</div>
               <div className="font-mono" style={{ fontSize: 10, color: "var(--muted-dim)", marginTop: 4 }}>
                 {new Date(n.created_at).toLocaleString()}
               </div>
+
             </div>
           </div>
         ))

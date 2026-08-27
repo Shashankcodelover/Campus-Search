@@ -139,7 +139,11 @@ export function BrowsePage({ onRequestListing }) {
                 <div className="listing-card__meta" style={{ marginBottom: 12 }}>
                   <Badge tone="muted">{l.category}</Badge>
                   <span style={{ fontSize: 11 }}>{l.condition_notes}</span>
+                  <span style={{ fontSize: 11, fontWeight: "600", color: l.quantity === 1 ? "var(--amber)" : "var(--signal)", marginLeft: "auto" }}>
+                    Stock: {l.quantity || 1} unit{(l.quantity || 1) !== 1 ? "s" : ""}
+                  </span>
                 </div>
+
 
                 <div className="listing-card__footer" style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--trace)" }}>
                   <div className="listing-card__seller">

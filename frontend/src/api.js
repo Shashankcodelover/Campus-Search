@@ -99,6 +99,8 @@ export const api = {
   // ---- Profiles ----
   getMyProfile: () => request("/profiles/me"),
   getProfile: (id) => request(`/profiles/${id}`),
+  updateMyProfile: (body) => request("/profiles/me", { method: "PATCH", body: JSON.stringify(body) }),
+
 
   // ---- Messages ----
   getMessages: (requestId) => request(`/messages/${requestId}`),

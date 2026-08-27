@@ -15,19 +15,25 @@ router.get("/me", requireAuth, (req, res) => {
   res.json(buildProfile(req.user.id, true));
 });
 
-// GET /api/profiles/:id — public profile of any user
-router.get("/:id", requireAuth, (req, res) => {
-  const user = db.prepare("SELECT id FROM users WHERE id = ?").get(req.params.id);
-  if (!user) return res.status(404).json({ error: "User not found." });
-  res.json(buildProfile(req.params.id, req.params.id === req.user.id));
+// PATCH /api/profiles/me — update profile (bio, phone, upi_vpa, qr_image_data)
+router.patch("/me", requireAuth, (req, res) => {
+  const { bio, phone, upi_vpa, qr_image_data } = req.body;
+  
+  if (bio !== undefined) db.prepare("UPDATE users SET bio = ? WHERE id = ?").run(bio, req.user.id);
+  if (phone !== undefined) db.prepare("UPDATE users SET phone = ? WHERE id = ?").run(phone, req.user.id);
+  if (upi_vpa !== undefined) db.prepare("UPDATE users SET upi_vpa = ? WHERE id = ?").run(upi_vpa, req.user.id);
+  if (qr_image_data !== undefined) db.prepare("UPDATE users SET qr_image_data = ? WHERE id = ?").run(qr_image_data, req.user.id);
+
+  res.json(buildProfile(req.user.id, true));
 });
 
 function buildProfile(userId, isOwner) {
   const user = db.prepare(
-    `SELECT id, name, email, phone, department, year, role, verified,
+    `SELECT id, name, email, phone, department, year, role, verified, usn, upi_vpa, qr_image_data,
             rating_avg, rating_count, bio, avatar_url, created_at, suspended
      FROM users WHERE id = ?`
   ).get(userId);
+
 
   // Listing stats
   const listingCount = db.prepare("SELECT COUNT(*) as c FROM listings WHERE seller_id = ?").get(userId).c;

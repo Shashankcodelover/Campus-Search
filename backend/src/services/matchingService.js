@@ -111,7 +111,17 @@ function confirmDelivered(requestId, buyerId) {
   if (request.status !== "accepted") throw new HttpError(409, "This request isn't in an accepted state.");
 
   db.prepare(`UPDATE requests SET status = 'delivered', delivered_confirmed_at = datetime('now') WHERE id = ?`).run(requestId);
-  db.prepare(`UPDATE listings SET status = 'claimed', updated_at = datetime('now') WHERE id = ?`).run(request.listing_id);
+  
+  // Inventory quantity management:
+  // Decrement stock quantity by 1. If stock <= 0, mark as claimed (sold out). Otherwise keep available.
+  const listingItem = db.prepare("SELECT * FROM listings WHERE id = ?").get(request.listing_id);
+  const newQty = Math.max(0, (listingItem.quantity || 1) - 1);
+  const newStatus = newQty > 0 ? "available" : "claimed";
+
+  db.prepare(
+    `UPDATE listings SET quantity = ?, status = ?, updated_at = datetime('now') WHERE id = ?`
+  ).run(newQty, newStatus, request.listing_id);
+
 
   const listing = db.prepare("SELECT l.*, u.* FROM listings l JOIN users u ON u.id = l.seller_id WHERE l.id = ?").get(request.listing_id);
   const FLAT_FEE = 3;

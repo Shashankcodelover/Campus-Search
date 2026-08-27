@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Star, Package } from "lucide-react";
+import { Star, Package, QrCode, Upload, Save, Check } from "lucide-react";
 import { api } from "../api";
 import { Avatar } from "../components/common/Avatar";
 import { StatusDot } from "../components/common/StatusDot";
@@ -9,16 +9,52 @@ import { Skeleton } from "../components/common/Skeleton";
 export function ProfilePage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [upiVpa, setUpiVpa] = useState("");
+  const [qrImage, setQrImage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const data = await api.getMyProfile();
-        setProfile(data);
-      } catch (e) {}
-      setLoading(false);
-    })();
+    loadProfile();
   }, []);
+
+  const loadProfile = async () => {
+    try {
+      const data = await api.getMyProfile();
+      setProfile(data);
+      setUpiVpa(data.upi_vpa || "");
+      setQrImage(data.qr_image_data || "");
+    } catch (e) {}
+    setLoading(false);
+  };
+
+  const handleQrUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setQrImage(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSavePaymentSettings = async (e) => {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      const updated = await api.updateMyProfile({
+        upi_vpa: upiVpa.trim(),
+        qr_image_data: qrImage,
+      });
+      setProfile(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      alert("Failed to save UPI payment settings");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) return <Skeleton type="card" count={2} />;
   if (!profile) return <EmptyState icon="😕" title="Could not load profile" sub="Try refreshing the page." />;
@@ -30,7 +66,7 @@ export function ProfilePage() {
         <div className="profile-header__info">
           <h2 className="profile-header__name">{profile.name}</h2>
           <div className="profile-header__meta">
-            {profile.department} · {profile.year} · {profile.email}
+            {profile.department} · {profile.year} · {profile.email} {profile.usn ? `· USN: ${profile.usn}` : ""}
           </div>
           {profile.bio && <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 6 }}>{profile.bio}</div>}
           <div className="profile-badges">
@@ -42,6 +78,67 @@ export function ProfilePage() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Seller UPI Payment Setup Section */}
+      <div className="card" style={{ padding: "20px", marginBottom: "24px", borderLeft: "4px solid var(--signal)" }}>
+        <h4 style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "8px" }}>
+          <QrCode size={18} color="var(--signal)" /> My Peer Payment Setup (UPI & QR Code)
+        </h4>
+        <p style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "16px" }}>
+          Configure your UPI ID or upload your custom GPay / PhonePe / Paytm QR image so buyers can pay you directly upon component delivery.
+        </p>
+
+        <form onSubmit={handleSavePaymentSettings}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+            <div>
+              <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--muted)", display: "block", marginBottom: "4px" }}>
+                YOUR UPI VPA / ID
+              </label>
+              <input
+                type="text"
+                className="input"
+                placeholder="e.g. yourname@upi or 9876543210@ybl"
+                value={upiVpa}
+                onChange={(e) => setUpiVpa(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--muted)", display: "block", marginBottom: "4px" }}>
+                CUSTOM UPI QR CODE IMAGE
+              </label>
+              <input
+                type="file"
+                id="profile-qr-input"
+                accept="image/*"
+                onChange={handleQrUpload}
+                style={{ display: "none" }}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => document.getElementById("profile-qr-input").click()}
+                style={{ width: "100%", justifyContent: "center" }}
+              >
+                <Upload size={14} /> {qrImage ? "Change QR Image" : "Upload QR Image"}
+              </button>
+            </div>
+          </div>
+
+          {qrImage && (
+            <div style={{ textAlign: "center", background: "var(--raised)", padding: "12px", borderRadius: "var(--radius-md)", marginBottom: "16px" }}>
+              <span style={{ fontSize: "11px", color: "var(--signal)", fontWeight: "600", display: "block", marginBottom: "6px" }}>
+                Uploaded QR Image Preview:
+              </span>
+              <img src={qrImage} alt="Uploaded UPI QR" style={{ maxHeight: "140px", borderRadius: "8px" }} />
+            </div>
+          )}
+
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? "Saving..." : saved ? <><Check size={14} /> Saved Successfully</> : <><Save size={14} /> Save Payment Settings</>}
+          </button>
+        </form>
       </div>
 
       <div className="stats-grid" style={{ marginBottom: 24 }}>

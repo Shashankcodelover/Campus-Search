@@ -25,15 +25,12 @@ router.get("/intent/:requestId", requireAuth, (req, res) => {
   if (!isBuyer && !isSeller) return res.status(403).json({ error: "Unauthorized access to payment intent." });
 
   let intent = db.prepare("SELECT * FROM payment_intents WHERE request_id = ?").get(req.params.requestId);
+  const seller = db.prepare("SELECT name, phone, department, upi_vpa, qr_image_data FROM users WHERE id = ?").get(request.seller_id);
 
   if (!intent) {
-    const seller = db.prepare("SELECT name, phone FROM users WHERE id = ?").get(request.seller_id);
-    // Construct default UPI VPA format based on seller phone or standard campus ID
-    const upiVpa = `${seller.phone || "campus"}@upi`;
+    const upiVpa = seller.upi_vpa || `${seller.phone || "campus"}@upi`;
     const amount = request.price || 0;
     
-    // Construct standard UPI deep link payload
-    // upi://pay?pa=VPA&pn=NAME&am=AMOUNT&tn=REASON&cu=INR
     const encodedName = encodeURIComponent(seller.name);
     const encodedNote = encodeURIComponent(`CampusSearch - ${request.item_name}`);
     const qrData = `upi://pay?pa=${upiVpa}&pn=${encodedName}&am=${amount}&tn=${encodedNote}&cu=INR`;
@@ -47,9 +44,15 @@ router.get("/intent/:requestId", requireAuth, (req, res) => {
     intent = db.prepare("SELECT * FROM payment_intents WHERE id = ?").get(id);
   }
 
-  const seller = db.prepare("SELECT name, department FROM users WHERE id = ?").get(request.seller_id);
-  res.json({ ...intent, sellerName: seller.name, item_name: request.item_name });
+  res.json({
+    ...intent,
+    sellerName: seller.name,
+    sellerPhone: seller.phone,
+    sellerQrImage: seller.qr_image_data || null,
+    item_name: request.item_name,
+  });
 });
+
 
 // POST /api/payments/confirm/:intentId — Buyer marks UPI payment as completed
 router.post("/confirm/:intentId", requireAuth, (req, res) => {

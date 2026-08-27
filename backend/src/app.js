@@ -13,13 +13,15 @@ app.use(cors());
 app.use(express.json({ limit: "15mb" })); // Base64 ID photos & listing image uploads
 app.use(morgan("dev"));
 
-// Rate limiting — 200 requests per 15 min window
+// Rate limiting — 2000 requests per 15 min window, ignore notification polling
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 2000,
+  skip: (req) => req.path.includes("/notifications/unread-count") || req.path.includes("/notifications/stream"),
   message: { error: "Too many requests from this IP, please try again later." },
 });
 app.use("/api/", limiter);
+
 
 // DB init is async with sql.js (WASM), so block requests until DB is ready
 let dbReady = false;
