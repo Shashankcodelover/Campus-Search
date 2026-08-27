@@ -91,7 +91,7 @@ export default function App() {
       id: "inbox", label: "Requests", icon: <Inbox size={14} />,
       badge: (unreadBreakdown["new_request"] || 0) + (unreadBreakdown["request_accepted"] || 0) + (unreadBreakdown["new_message"] || 0)
     },
-    { id: "wishlist", label: "Wanted", icon: <Heart size={14} /> },
+    { id: "wishlist", label: "Wanted / Alerts", icon: <Heart size={14} /> },
     { id: "notion", label: "Docs", icon: <BookOpen size={14} /> },
     { id: "profile", label: "Profile", icon: <User size={14} /> },
     { id: "admin", label: "Admin", icon: <ShieldCheck size={14} /> },

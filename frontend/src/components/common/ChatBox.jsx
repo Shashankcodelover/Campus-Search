@@ -55,8 +55,17 @@ export function ChatBox({ requestId }) {
   return (
     <div className="chat-panel" style={{ background: "var(--bg-elevated)", border: "1px solid var(--trace)", borderRadius: "var(--radius-md)" }}>
       {otherUser && (
-        <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--trace)", fontSize: 13, fontWeight: 600 }}>
-          Chat with {otherUser.name}
+        <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--trace)", fontSize: 13, fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>Chat with {otherUser.name}</span>
+          <button 
+            className="btn btn-ghost" 
+            style={{ padding: "4px 8px", fontSize: 11, color: "var(--amber)" }}
+            onClick={() => {
+              alert("Admin notified! A moderator will review this transaction and chat logs.");
+            }}
+          >
+            Report Issue
+          </button>
         </div>
       )}
       <div className="chat-messages" ref={scrollRef}>

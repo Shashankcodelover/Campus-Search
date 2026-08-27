@@ -68,9 +68,15 @@ export function SellerInbox({ onOpenPayment }) {
           {requests.map((r) => (
             <div key={r.id} className="card card-hover" style={{ padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{r.item_name}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                  {r.item_name}
+                  {r.listing_type === 'rent' && <span className="tab-badge" style={{ position: "static", background: "var(--signal)", padding: "2px 6px" }}>RENTAL</span>}
+                </div>
                 <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
                   Requested: {new Date(r.created_at).toLocaleString()}
+                  {r.listing_type === 'rent' && (
+                    <span style={{ display: "block", marginTop: 2, color: "var(--amber)" }}>Return expected by: <strong>{r.return_by || "Arranged"}</strong></span>
+                  )}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
@@ -97,9 +103,15 @@ export function SellerInbox({ onOpenPayment }) {
                 <div key={r.id} className="card" style={{ padding: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
                     <div>
-                      <h4 style={{ fontSize: 15 }}>{r.item_name}</h4>
+                      <h4 style={{ fontSize: 15, display: "flex", alignItems: "center", gap: 6 }}>
+                        {r.item_name}
+                        {r.listing_type === 'rent' && <span className="tab-badge" style={{ position: "static", background: "var(--signal)", padding: "2px 6px" }}>RENTAL</span>}
+                      </h4>
                       <p style={{ fontSize: 12, color: "var(--muted)" }}>
                         Committed Delivery: <strong style={{ color: "var(--signal)" }}>{r.delivery_day}</strong>
+                        {r.listing_type === 'rent' && (
+                          <span style={{ display: "block", marginTop: 2, color: "var(--amber)" }}>Must return by: <strong>{r.return_by || "Arranged"}</strong></span>
+                        )}
                       </p>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
@@ -132,9 +144,15 @@ export function SellerInbox({ onOpenPayment }) {
                 <div key={r.id} className="card" style={{ padding: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
                     <div>
-                      <h4 style={{ fontSize: 15 }}>{r.item_name}</h4>
+                      <h4 style={{ fontSize: 15, display: "flex", alignItems: "center", gap: 6 }}>
+                        {r.item_name}
+                        {r.listing_type === 'rent' && <span className="tab-badge" style={{ position: "static", background: "var(--signal)", padding: "2px 6px" }}>RENTAL</span>}
+                      </h4>
                       <p style={{ fontSize: 12, color: "var(--muted)" }}>
                         Delivery committed: <strong style={{ color: "var(--signal)" }}>{r.delivery_day || "Scheduled"}</strong>
+                        {r.listing_type === 'rent' && (
+                          <span style={{ display: "block", marginTop: 2, color: "var(--amber)" }}>Must return by: <strong>{r.return_by || "Arranged"}</strong></span>
+                        )}
                       </p>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>

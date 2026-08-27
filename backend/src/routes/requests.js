@@ -54,11 +54,11 @@ router.get("/:id/contact", requireAuth, (req, res) => {
 // Mine — for both buyer and seller dashboards
 router.get("/mine", requireAuth, (req, res) => {
   const asBuyer = db
-    .prepare(`SELECT r.*, l.item_name FROM requests r JOIN listings l ON l.id = r.listing_id WHERE r.buyer_id = ? ORDER BY r.created_at DESC`)
+    .prepare(`SELECT r.*, l.item_name, l.listing_type, l.return_by FROM requests r JOIN listings l ON l.id = r.listing_id WHERE r.buyer_id = ? ORDER BY r.created_at DESC`)
     .all(req.user.id);
   const asSeller = db
     .prepare(
-      `SELECT r.*, l.item_name FROM requests r JOIN listings l ON l.id = r.listing_id WHERE l.seller_id = ? ORDER BY r.created_at DESC`
+      `SELECT r.*, l.item_name, l.listing_type, l.return_by FROM requests r JOIN listings l ON l.id = r.listing_id WHERE l.seller_id = ? ORDER BY r.created_at DESC`
     )
     .all(req.user.id);
   res.json({ asBuyer, asSeller });

@@ -39,13 +39,22 @@ export function ListItemModal({ onClose, onCreated }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input className="input" placeholder="Item name * (e.g. Arduino Uno R3)" value={form.item_name} onChange={set("item_name")} id="list-name" />
           
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 4 }}>
+            <button className={`btn ${form.listing_type === 'sale' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setForm(f => ({...f, listing_type: 'sale'}))}>💰 For Sale</button>
+            <button className={`btn ${form.listing_type === 'rent' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setForm(f => ({...f, listing_type: 'rent'}))}>⏱ For Rent/Borrow</button>
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
             <select className="input" value={form.category} onChange={set("category")} id="list-category">
               {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
             </select>
-            <input className="input" type="number" placeholder="Price (₹)" value={form.price} onChange={set("price")} id="list-price" />
+            <input className="input" type="number" placeholder={form.listing_type === 'rent' ? "Rental Fee (₹)" : "Price (₹)"} value={form.price} onChange={set("price")} id="list-price" />
             <input className="input" type="number" min="1" placeholder="Qty (Units)" value={form.quantity} onChange={set("quantity")} id="list-quantity" title="Available stock quantity" />
           </div>
+
+          {form.listing_type === 'rent' && (
+            <input className="input" placeholder="Return by? (e.g. End of Semester, 3 Days)" value={form.return_by || ""} onChange={set("return_by")} />
+          )}
 
           <input className="input" placeholder="Condition * (e.g. Working, like new)" value={form.condition_notes} onChange={set("condition_notes")} id="list-condition" />
           <textarea className="input" placeholder="Description (pinout details, cables included, etc.)" value={form.description} onChange={set("description")} id="list-description" rows={3} />

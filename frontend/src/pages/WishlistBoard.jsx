@@ -32,12 +32,12 @@ export function WishlistBoard() {
   return (
     <div className="page-enter">
       <div className="section-header">
-        <h2 className="section-title"><Heart size={22} /> Wanted Board</h2>
-        <button onClick={() => setShowForm(!showForm)} className="btn btn-primary"><Plus size={14} /> Post a want</button>
+        <h2 className="section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}><Heart size={22} /> Wanted Board & Smart Alerts</h2>
+        <button onClick={() => setShowForm(!showForm)} className="btn btn-primary"><Plus size={14} /> Create Alert</button>
       </div>
 
       <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 20 }}>
-        Looking for something specific? Post it here — sellers will be notified when matching items are listed.
+        Can't find what you need? Add it below to create a <strong>Smart Alert</strong>. You will receive an instant notification as soon as another student lists a matching component!
       </p>
 
       {showForm && (

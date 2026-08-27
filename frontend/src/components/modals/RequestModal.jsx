@@ -66,6 +66,11 @@ export function RequestModal({ listing, onClose, onRefresh }) {
 
         {!request && !error && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16 }}>
+            {listing.listing_type === 'rent' && (
+              <div style={{ background: "rgba(110, 231, 160, 0.1)", padding: 12, borderRadius: 8, color: "var(--signal)", fontSize: 13 }}>
+                <strong>⚠️ Rental Agreement:</strong> You are borrowing this item. It must be returned by: <strong>{listing.return_by || "Arranged via chat"}</strong>.
+              </div>
+            )}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ fontSize: 14, fontWeight: 500 }}>Quantity to request:</span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
