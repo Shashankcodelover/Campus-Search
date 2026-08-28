@@ -3,8 +3,8 @@ import { Cpu, Search, MapPin, QrCode, ShieldCheck, ArrowRight } from "lucide-rea
 
 export function LandingPage({ onGetStarted }) {
   return (
-    <div className="page-wrapper" style={{ justifyContent: "center", minHeight: "100vh", padding: "20px" }}>
-      <div className="container" style={{ maxWidth: 900, margin: "auto", padding: "40px 20px" }}>
+    <div className="page-wrapper" style={{ minHeight: "100vh", padding: "40px 20px", display: "flex", flexDirection: "column" }}>
+      <div className="container" style={{ maxWidth: 900, margin: "auto", padding: "20px 0" }}>
         
         {/* Hero Section */}
         <div style={{ textAlign: "center", marginBottom: 60, animation: "slideDown 0.6s ease-out" }}>

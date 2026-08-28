@@ -521,11 +521,13 @@ select.input {
 .auth-wrapper {
   min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+  padding: 40px 20px;
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.auth-wrapper > .card {
+  margin: auto;
 }
 .auth-wrapper::before {
   content: '';
