@@ -12,7 +12,7 @@ const router = express.Router();
 
 // GET /api/profiles/me — current user's full profile
 router.get("/me", requireAuth, async (req, res) => {
-  res.json(buildProfile(req.user.id, true));
+  res.json(await buildProfile(req.user.id, true));
 });
 
 // PATCH /api/profiles/me — update profile (bio, phone, upi_vpa, qr_image_data)
@@ -24,10 +24,10 @@ router.patch("/me", requireAuth, async (req, res) => {
   if (upi_vpa !== undefined) await db.prepare("UPDATE users SET upi_vpa = ? WHERE id = ?").run(upi_vpa, req.user.id);
   if (qr_image_data !== undefined) await db.prepare("UPDATE users SET qr_image_data = ? WHERE id = ?").run(qr_image_data, req.user.id);
 
-  res.json(buildProfile(req.user.id, true));
+  res.json(await buildProfile(req.user.id, true));
 });
 
-function buildProfile(userId, isOwner) {
+async function buildProfile(userId, isOwner) {
   const user = await db.prepare(
     `SELECT id, name, email, phone, department, year, role, verified, usn, upi_vpa, qr_image_data,
             rating_avg, rating_count, bio, avatar_url, created_at, suspended

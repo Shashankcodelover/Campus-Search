@@ -179,8 +179,8 @@ router.patch("/:id", requireAuth, async (req, res) => {
 });
 
 // Sweep stale listings — call from a scheduled job (see server.js)
-function sweepExpiredListings() {
-  await db.prepare(`UPDATE listings SET status = 'expired' WHERE status = 'available' AND expires_at < datetime('now')`).run();
+async function sweepExpiredListings() {
+  await db.prepare(`UPDATE listings SET status = 'expired' WHERE status = 'available' AND expires_at < CURRENT_TIMESTAMP`).run();
 }
 
 module.exports = router;

@@ -14,7 +14,7 @@ const router = express.Router();
 
 // GET /api/messages/:requestId — get conversation
 router.get("/:requestId", requireAuth, async (req, res) => {
-  const access = checkAccess(req.params.requestId, req.user.id);
+  const access = await checkAccess(req.params.requestId, req.user.id);
   if (!access.ok) return res.status(access.status).json({ error: access.error });
 
   const messages = await db.prepare(
@@ -28,7 +28,7 @@ router.get("/:requestId", requireAuth, async (req, res) => {
 
 // POST /api/messages/:requestId — send a message
 router.post("/:requestId", requireAuth, async (req, res) => {
-  const access = checkAccess(req.params.requestId, req.user.id);
+  const access = await checkAccess(req.params.requestId, req.user.id);
   if (!access.ok) return res.status(access.status).json({ error: access.error });
 
   const { body } = req.body;
@@ -52,7 +52,7 @@ router.post("/:requestId", requireAuth, async (req, res) => {
   res.status(201).json(message);
 });
 
-function checkAccess(requestId, userId) {
+async function checkAccess(requestId, userId) {
   const request = await db.prepare("SELECT * FROM requests WHERE id = ?").get(requestId);
   if (!request) return { ok: false, status: 404, error: "Request not found." };
 

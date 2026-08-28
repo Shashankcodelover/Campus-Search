@@ -31,7 +31,7 @@ router.get("/mine", requireAuth, async (req, res) => {
   ).all(req.user.id);
 
   // Attach responses if open or matched
-  const result = inquiries.map((inq) => {
+  const result = await Promise.all(inquiries.map(async (inq) => {
     const responses = await db.prepare(
       `SELECT ir.*, u.name as seller_name, u.department as seller_department, u.rating_avg as seller_rating,
               l.item_name as listing_name
@@ -42,7 +42,7 @@ router.get("/mine", requireAuth, async (req, res) => {
        ORDER BY ir.created_at DESC`
     ).all(inq.id);
     return { ...inq, responses };
-  });
+  }));
 
   res.json(result);
 });
