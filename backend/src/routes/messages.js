@@ -13,11 +13,11 @@ const sseService = require("../services/sseService");
 const router = express.Router();
 
 // GET /api/messages/:requestId — get conversation
-router.get("/:requestId", requireAuth, (req, res) => {
+router.get("/:requestId", requireAuth, async (req, res) => {
   const access = checkAccess(req.params.requestId, req.user.id);
   if (!access.ok) return res.status(access.status).json({ error: access.error });
 
-  const messages = db.prepare(
+  const messages = await db.prepare(
     `SELECT m.*, u.name as sender_name
      FROM messages m JOIN users u ON u.id = m.sender_id
      WHERE m.request_id = ? ORDER BY m.created_at ASC`
@@ -27,7 +27,7 @@ router.get("/:requestId", requireAuth, (req, res) => {
 });
 
 // POST /api/messages/:requestId — send a message
-router.post("/:requestId", requireAuth, (req, res) => {
+router.post("/:requestId", requireAuth, async (req, res) => {
   const access = checkAccess(req.params.requestId, req.user.id);
   if (!access.ok) return res.status(access.status).json({ error: access.error });
 
@@ -35,11 +35,11 @@ router.post("/:requestId", requireAuth, (req, res) => {
   if (!body || !body.trim()) return res.status(400).json({ error: "Message body is required." });
 
   const id = uuid();
-  db.prepare(
+  await db.prepare(
     `INSERT INTO messages (id, request_id, sender_id, body) VALUES (?, ?, ?, ?)`
   ).run(id, req.params.requestId, req.user.id, body.trim());
 
-  const message = db.prepare(
+  const message = await db.prepare(
     `SELECT m.*, u.name as sender_name FROM messages m JOIN users u ON u.id = m.sender_id WHERE m.id = ?`
   ).get(id);
 
@@ -53,10 +53,10 @@ router.post("/:requestId", requireAuth, (req, res) => {
 });
 
 function checkAccess(requestId, userId) {
-  const request = db.prepare("SELECT * FROM requests WHERE id = ?").get(requestId);
+  const request = await db.prepare("SELECT * FROM requests WHERE id = ?").get(requestId);
   if (!request) return { ok: false, status: 404, error: "Request not found." };
 
-  const listing = db.prepare("SELECT * FROM listings WHERE id = ?").get(request.listing_id);
+  const listing = await db.prepare("SELECT * FROM listings WHERE id = ?").get(request.listing_id);
 
   const isBuyer = request.buyer_id === userId;
   const isSeller = listing.seller_id === userId;
@@ -71,7 +71,7 @@ function checkAccess(requestId, userId) {
   }
 
   const otherUserId = isBuyer ? listing.seller_id : request.buyer_id;
-  const otherUser = db.prepare("SELECT id, name, department FROM users WHERE id = ?").get(otherUserId);
+  const otherUser = await db.prepare("SELECT id, name, department FROM users WHERE id = ?").get(otherUserId);
 
   return { ok: true, otherUser };
 }

@@ -9,7 +9,7 @@ const router = express.Router();
 const LISTING_LIFETIME_DAYS = 60; // stale-listing sweep, see roadmap "listing decay" edge case
 
 // GET /api/listings?search=&category=&status=available&sort=newest&min_price=&max_price=&condition=
-router.get("/", (req, res) => {
+router.get("/", async (req, res) => {
   const {
     search = "",
     category = "All",
@@ -71,11 +71,11 @@ router.get("/", (req, res) => {
       query += " ORDER BY l.created_at DESC";
   }
 
-  const listings = db.prepare(query).all(...params);
+  const listings = await db.prepare(query).all(...params);
   res.json(listings);
 });
 
-router.post("/", requireAuth, (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   const { item_name, category, condition_notes, description, price, quantity, listing_type, return_by, parent_kit_id, image_data } = req.body;
   if (!item_name || !category) return res.status(400).json({ error: "item_name and category are required." });
 
@@ -83,18 +83,18 @@ router.post("/", requireAuth, (req, res) => {
   const expiresAt = new Date(Date.now() + LISTING_LIFETIME_DAYS * 86400000).toISOString();
   const qty = parseInt(quantity, 10) > 0 ? parseInt(quantity, 10) : 1;
 
-  db.prepare(
+  await db.prepare(
     `INSERT INTO listings (id, seller_id, item_name, category, condition_notes, description, price, quantity, listing_type, return_by, parent_kit_id, image_data, expires_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(id, req.user.id, item_name, category, condition_notes || "", description || "", price || 0, qty, listing_type || "sale", return_by || null, parent_kit_id || null, image_data || null, expiresAt);
 
 
-  const listing = db.prepare("SELECT * FROM listings WHERE id = ?").get(id);
+  const listing = await db.prepare("SELECT * FROM listings WHERE id = ?").get(id);
   const flags = moderationService.screenListing(listing, req.user);
 
   // Auto-match wishlists: notify buyers looking for this type of item
   try {
-    const matchingWishes = db.prepare(
+    const matchingWishes = await db.prepare(
       `SELECT w.*, u.id as wish_user_id, u.name as wish_user_name
        FROM wishlists w JOIN users u ON u.id = w.user_id
        WHERE w.status = 'open'
@@ -110,7 +110,7 @@ router.post("/", requireAuth, (req, res) => {
       const overlap = wishWords.some((w) => listingWords.some((l) => l.includes(w) || w.includes(l)));
 
       if (overlap || wish.category === category) {
-        const wisher = db.prepare("SELECT * FROM users WHERE id = ?").get(wish.user_id);
+        const wisher = await db.prepare("SELECT * FROM users WHERE id = ?").get(wish.user_id);
         notificationService.notify(wisher, {
           type: "wishlist_match",
           title: "Wishlist match!",
@@ -126,7 +126,7 @@ router.post("/", requireAuth, (req, res) => {
   res.status(201).json({ listing, flagged: flags.length > 0 });
 });
 
-router.get("/:id", (req, res) => {
+router.get("/:id", async (req, res) => {
   const listing = db
     .prepare(
       `SELECT l.*, u.name as seller_name, u.department as seller_department,
@@ -137,31 +137,31 @@ router.get("/:id", (req, res) => {
   if (!listing) return res.status(404).json({ error: "Listing not found." });
 
   // Increment view count
-  db.prepare("UPDATE listings SET view_count = view_count + 1 WHERE id = ?").run(req.params.id);
+  await db.prepare("UPDATE listings SET view_count = view_count + 1 WHERE id = ?").run(req.params.id);
 
   res.json(listing);
 });
 
 // DELETE /api/listings/:id — seller can remove their own listing
-router.delete("/:id", requireAuth, (req, res) => {
-  const listing = db.prepare("SELECT * FROM listings WHERE id = ?").get(req.params.id);
+router.delete("/:id", requireAuth, async (req, res) => {
+  const listing = await db.prepare("SELECT * FROM listings WHERE id = ?").get(req.params.id);
   if (!listing) return res.status(404).json({ error: "Listing not found." });
   if (listing.seller_id !== req.user.id && req.user.role !== "admin") {
     return res.status(403).json({ error: "Not your listing." });
   }
 
-  db.prepare("UPDATE listings SET status = 'removed' WHERE id = ?").run(req.params.id);
+  await db.prepare("UPDATE listings SET status = 'removed' WHERE id = ?").run(req.params.id);
   res.json({ ok: true });
 });
 
 // PATCH /api/listings/:id — edit listing details
-router.patch("/:id", requireAuth, (req, res) => {
+router.patch("/:id", requireAuth, async (req, res) => {
   const { item_name, description, price, quantity, condition_notes, listing_type, return_by } = req.body;
-  const listing = db.prepare("SELECT * FROM listings WHERE id = ?").get(req.params.id);
+  const listing = await db.prepare("SELECT * FROM listings WHERE id = ?").get(req.params.id);
   if (!listing) return res.status(404).json({ error: "Listing not found." });
   if (listing.seller_id !== req.user.id) return res.status(403).json({ error: "Not your listing." });
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE listings 
     SET item_name = ?, description = ?, price = ?, quantity = ?, condition_notes = ?, listing_type = ?, return_by = ?
     WHERE id = ?
@@ -180,7 +180,7 @@ router.patch("/:id", requireAuth, (req, res) => {
 
 // Sweep stale listings — call from a scheduled job (see server.js)
 function sweepExpiredListings() {
-  db.prepare(`UPDATE listings SET status = 'expired' WHERE status = 'available' AND expires_at < datetime('now')`).run();
+  await db.prepare(`UPDATE listings SET status = 'expired' WHERE status = 'available' AND expires_at < datetime('now')`).run();
 }
 
 module.exports = router;

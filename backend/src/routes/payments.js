@@ -11,8 +11,8 @@ const { db } = require("../db");
 const router = express.Router();
 
 // GET /api/payments/intent/:requestId — Get or create payment intent with UPI QR data
-router.get("/intent/:requestId", requireAuth, (req, res) => {
-  const request = db.prepare(
+router.get("/intent/:requestId", requireAuth, async (req, res) => {
+  const request = await db.prepare(
     `SELECT r.*, l.item_name, l.price, l.seller_id 
      FROM requests r JOIN listings l ON l.id = r.listing_id 
      WHERE r.id = ?`
@@ -24,8 +24,8 @@ router.get("/intent/:requestId", requireAuth, (req, res) => {
   const isSeller = request.seller_id === req.user.id;
   if (!isBuyer && !isSeller) return res.status(403).json({ error: "Unauthorized access to payment intent." });
 
-  let intent = db.prepare("SELECT * FROM payment_intents WHERE request_id = ?").get(req.params.requestId);
-  const seller = db.prepare("SELECT name, phone, department, upi_vpa, qr_image_data FROM users WHERE id = ?").get(request.seller_id);
+  let intent = await db.prepare("SELECT * FROM payment_intents WHERE request_id = ?").get(req.params.requestId);
+  const seller = await db.prepare("SELECT name, phone, department, upi_vpa, qr_image_data FROM users WHERE id = ?").get(request.seller_id);
 
   if (!intent) {
     const upiVpa = seller.upi_vpa || `${seller.phone || "campus"}@upi`;
@@ -36,12 +36,12 @@ router.get("/intent/:requestId", requireAuth, (req, res) => {
     const qrData = `upi://pay?pa=${upiVpa}&pn=${encodedName}&am=${amount}&tn=${encodedNote}&cu=INR`;
 
     const id = uuid();
-    db.prepare(
+    await db.prepare(
       `INSERT INTO payment_intents (id, request_id, seller_id, buyer_id, amount, upi_vpa, qr_data, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`
     ).run(id, req.params.requestId, request.seller_id, request.buyer_id, amount, upiVpa, qrData);
 
-    intent = db.prepare("SELECT * FROM payment_intents WHERE id = ?").get(id);
+    intent = await db.prepare("SELECT * FROM payment_intents WHERE id = ?").get(id);
   }
 
   res.json({
@@ -55,19 +55,19 @@ router.get("/intent/:requestId", requireAuth, (req, res) => {
 
 
 // POST /api/payments/confirm/:intentId — Buyer marks UPI payment as completed
-router.post("/confirm/:intentId", requireAuth, (req, res) => {
-  const intent = db.prepare("SELECT * FROM payment_intents WHERE id = ?").get(req.params.intentId);
+router.post("/confirm/:intentId", requireAuth, async (req, res) => {
+  const intent = await db.prepare("SELECT * FROM payment_intents WHERE id = ?").get(req.params.intentId);
   if (!intent) return res.status(404).json({ error: "Payment intent not found." });
   if (intent.buyer_id !== req.user.id) return res.status(403).json({ error: "Only buyer can confirm payment." });
 
-  db.prepare(
+  await db.prepare(
     `UPDATE payment_intents SET status = 'paid', paid_at = datetime('now') WHERE id = ?`
   ).run(req.params.intentId);
 
   // Notify seller of payment completion
   const notificationService = require("../services/notificationService");
-  const buyer = db.prepare("SELECT name FROM users WHERE id = ?").get(req.user.id);
-  const seller = db.prepare("SELECT * FROM users WHERE id = ?").get(intent.seller_id);
+  const buyer = await db.prepare("SELECT name FROM users WHERE id = ?").get(req.user.id);
+  const seller = await db.prepare("SELECT * FROM users WHERE id = ?").get(intent.seller_id);
 
   notificationService.notify(seller, {
     type: "payment_confirmed",

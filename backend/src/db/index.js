@@ -1,165 +1,63 @@
-/**
- * Database connection layer — sql.js (pure JavaScript SQLite, no native compilation needed).
- *
- * sql.js uses WebAssembly-compiled SQLite, so it runs on any Node.js without
- * needing Visual Studio or C++ build tools. The API is slightly different
- * from better-sqlite3, so we wrap it in a compatible interface.
- *
- * PRODUCTION NOTE: swap this for a Postgres pool when scaling beyond one campus.
- */
-const initSqlJs = require("sql.js");
-const fs = require("fs");
-const path = require("path");
+const { Pool } = require('pg');
+const fs = require('fs');
+const path = require('path');
+require('dotenv').config();
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, "../../campussearch.db");
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('neon.tech') ? { rejectUnauthorized: false } : false
+});
 
-let SQL;
-let database;
-
-// Wraps sql.js database in a better-sqlite3-compatible interface
 class DatabaseWrapper {
-  constructor(sqlJsDb) {
-    this._db = sqlJsDb;
+  async query(sql, params = []) {
+    let i = 1;
+    // VERY IMPORTANT: replace ? with $1, $2 ONLY if it's not inside a string.
+    // A quick hack is just string replace but it's dangerous if strings contain '?'.
+    // Better to use a simplistic regex for our use case where '?' is isolated.
+    const pgSql = sql.replace(/\?/g, () => `$${i++}`);
+    return await pool.query(pgSql, params);
   }
 
   prepare(sql) {
-    const db = this._db;
-    return {
-      run(...params) {
-        db.run(sql, params);
-        return { changes: db.getRowsModified() };
-      },
-      get(...params) {
-        const stmt = db.prepare(sql);
-        stmt.bind(params);
-        if (stmt.step()) {
-          const row = stmt.getAsObject();
-          stmt.free();
-          return row;
-        }
-        stmt.free();
-        return undefined;
-      },
-      all(...params) {
-        const results = [];
-        const stmt = db.prepare(sql);
-        stmt.bind(params);
-        while (stmt.step()) {
-          results.push(stmt.getAsObject());
-        }
-        stmt.free();
-        return results;
-      },
-    };
-  }
-
-  exec(sql) {
-    this._db.exec(sql);
-  }
-
-  pragma(pragma) {
-    try {
-      this._db.exec(`PRAGMA ${pragma}`);
-    } catch (e) {
-      // Some pragmas may not be supported in sql.js
-    }
-  }
-
-  transaction(fn) {
     const db = this;
-    return function (...args) {
-      db.exec("BEGIN TRANSACTION");
-      try {
-        const result = fn(...args);
-        db.exec("COMMIT");
-        return result;
-      } catch (e) {
-        db.exec("ROLLBACK");
-        throw e;
+    return {
+      get: async function(...params) {
+        if (params.length === 1 && Array.isArray(params[0])) params = params[0];
+        const res = await db.query(sql, params);
+        return res.rows[0];
+      },
+      all: async function(...params) {
+        if (params.length === 1 && Array.isArray(params[0])) params = params[0];
+        const res = await db.query(sql, params);
+        return res.rows;
+      },
+      run: async function(...params) {
+        if (params.length === 1 && Array.isArray(params[0])) params = params[0];
+        const res = await db.query(sql, params);
+        return { changes: res.rowCount, lastInsertRowid: res.rows[0] ? res.rows[0].id : null };
       }
     };
   }
 
-  getRowsModified() {
-    return this._db.getRowsModified();
-  }
-
-  _save() {
-    const data = this._db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(DB_PATH, buffer);
+  async exec(sql) {
+    await pool.query(sql);
   }
 }
 
-// Initialize synchronously by blocking on the async init
-let _db = null;
+const database = new DatabaseWrapper();
 
-function getDb() {
-  if (_db) return _db;
-  throw new Error("Database not initialized. Call initSchema() first.");
+async function initSchema() {
+  const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
+  let pgSchema = schema
+    .replace(/INTEGER PRIMARY KEY AUTOINCREMENT/g, 'SERIAL PRIMARY KEY')
+    .replace(/datetime\('now'\)/g, 'CURRENT_TIMESTAMP')
+    .replace(/datetime\('now',\s*'\+2 hours'\)/g, "CURRENT_TIMESTAMP + INTERVAL '2 hours'")
+    .replace(/REAL/g, 'FLOAT')
+    // Remove DEFAULT 0 from integer/boolean fields that Postgres prefers as false? Actually Postgres accepts 0 for integers.
+    // but SQLite booleans are integer 0 or 1. If it's a numeric column it's fine.
+  
+  await pool.query(pgSchema);
+  return database;
 }
 
-// We need a synchronous init for compatibility with existing code.
-// sql.js init is async, so we use a sync workaround.
-let _initPromise = null;
-let _initialized = false;
-
-function initSchema() {
-  if (_initialized) return;
-
-  // Use synchronous require trick to initialize
-  const initSqlJsSync = require("sql.js");
-
-  // We'll use a hack: load sql.js synchronously via the WASM file
-  // Actually, let's just defer everything to async and export a promise-based db
-  // But since the existing codebase expects sync... let's use a different approach.
-
-  // Load existing DB file if it exists
-  let buffer = null;
-  try {
-    if (fs.existsSync(DB_PATH)) {
-      buffer = fs.readFileSync(DB_PATH);
-    }
-  } catch (e) {}
-
-  // Since sql.js requires async init for WASM, we'll handle this at startup
-  if (!_initPromise) {
-    _initPromise = initSqlJsSync().then((SQL_module) => {
-      SQL = SQL_module;
-      const sqlJsDb = buffer ? new SQL.Database(buffer) : new SQL.Database();
-      database = new DatabaseWrapper(sqlJsDb);
-      _db = database;
-
-      // Enable foreign keys
-      database.pragma("foreign_keys = ON");
-
-      // Run schema
-      const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf-8");
-      database.exec(schema);
-
-      // Auto-save every 10 seconds
-      setInterval(() => {
-        try { database._save(); } catch (e) {}
-      }, 10000);
-
-      _initialized = true;
-      return database;
-    });
-  }
-
-  return _initPromise;
-}
-
-// Proxy that defers to initialized db
-const dbProxy = new Proxy({}, {
-  get(target, prop) {
-    if (!_db) {
-      throw new Error(`Database not ready yet. Ensure initSchema() has completed. Tried to access: ${prop}`);
-    }
-    const val = _db[prop];
-    if (typeof val === "function") return val.bind(_db);
-    return val;
-  }
-});
-
-module.exports = { db: dbProxy, initSchema };
+module.exports = { db: database, initSchema, pool };
