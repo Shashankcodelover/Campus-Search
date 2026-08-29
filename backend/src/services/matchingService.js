@@ -25,9 +25,8 @@ const INQUIRY_WINDOW_MS = 24 * 60 * 60 * 1000;       // 24 hours for inquiry res
 // FLOW A: Direct Request
 // =============================================
 
-function createRequest(listingId, buyerId, quantity = 1) {
-  const tx = db.transaction(() => {
-    const listing = db.prepare("SELECT * FROM listings WHERE id = ?").get(listingId);
+async function createRequest(listingId, buyerId, quantity = 1) {
+      const listing = await db.prepare("SELECT * FROM listings WHERE id = ?").get(listingId);
     if (!listing) throw new HttpError(404, "Listing not found");
     if (listing.status === "claimed" || listing.quantity < quantity) {
       throw new HttpError(409, "This item does not have enough stock available.");
@@ -37,21 +36,20 @@ function createRequest(listingId, buyerId, quantity = 1) {
     }
 
     const id = uuid();
-    db.prepare(
+    await db.prepare(
       `INSERT INTO requests (id, listing_id, buyer_id, quantity, status) VALUES (?, ?, ?, ?, 'notified')`
     ).run(id, listingId, buyerId, quantity);
 
     const newQty = listing.quantity - quantity;
     const newStatus = newQty > 0 ? "available" : "pending";
-    db.prepare(`UPDATE listings SET quantity = ?, status = ?, updated_at = datetime('now') WHERE id = ?`).run(newQty, newStatus, listingId);
+    await db.prepare(`UPDATE listings SET quantity = ?, status = ?, updated_at = datetime('now') WHERE id = ?`).run(newQty, newStatus, listingId);
     
     return id;
-  });
 
-  const requestId = tx();
-  const request = getRequest(requestId);
-  const seller = db.prepare("SELECT * FROM users WHERE id = ?").get(request.seller_id);
-  const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(buyerId);
+  const requestId = id;
+  const request = await getRequest(requestId);
+  const seller = await db.prepare("SELECT * FROM users WHERE id = ?").get(request.seller_id);
+  const buyer = await db.prepare("SELECT * FROM users WHERE id = ?").get(buyerId);
 
   notificationService.notify(seller, {
     type: "new_request",
@@ -63,32 +61,28 @@ function createRequest(listingId, buyerId, quantity = 1) {
   return request;
 }
 
-function respondToRequest(requestId, sellerId, decision, deliveryDay) {
-  const tx = db.transaction(() => {
-    const request = getRequestRaw(requestId);
+async function respondToRequest(requestId, sellerId, decision, deliveryDay) {
+  const request = await getRequestRaw(requestId);
     if (!request) throw new HttpError(404, "Request not found");
 
-    const listing = db.prepare("SELECT * FROM listings WHERE id = ?").get(request.listing_id);
+    const listing = await db.prepare("SELECT * FROM listings WHERE id = ?").get(request.listing_id);
     if (listing.seller_id !== sellerId) throw new HttpError(403, "Only the seller can respond.");
     if (request.status !== "notified") throw new HttpError(409, "This request has already been resolved.");
 
     if (decision === "accept") {
       if (!deliveryDay) throw new HttpError(400, "A delivery day is required to accept.");
-      db.prepare(
+      await db.prepare(
         `UPDATE requests SET status = 'accepted', delivery_day = ?, accepted_at = datetime('now'), responded_at = datetime('now') WHERE id = ?`
       ).run(deliveryDay, requestId);
     } else {
-      db.prepare(`UPDATE requests SET status = 'declined', responded_at = datetime('now') WHERE id = ?`).run(requestId);
-      db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = datetime('now') WHERE id = ?`).run(request.listing_id);
+      await db.prepare(`UPDATE requests SET status = 'declined', responded_at = datetime('now') WHERE id = ?`).run(requestId);
+      await db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = datetime('now') WHERE id = ?`).run(request.listing_id);
     }
-  });
-
-  tx();
-  const updated = getRequest(requestId);
+  const updated = await getRequest(requestId);
 
   if (decision === "accept") {
-    const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(updated.buyer_id);
-    const seller = db.prepare("SELECT * FROM users WHERE id = ?").get(updated.seller_id);
+    const buyer = await db.prepare("SELECT * FROM users WHERE id = ?").get(updated.buyer_id);
+    const seller = await db.prepare("SELECT * FROM users WHERE id = ?").get(updated.seller_id);
     notificationService.notify(buyer, {
       type: "request_accepted",
       title: "✅ Request Accepted!",
@@ -96,7 +90,7 @@ function respondToRequest(requestId, sellerId, decision, deliveryDay) {
       data: { requestId, action: "go_to_inbox" },
     });
   } else {
-    const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(updated.buyer_id);
+    const buyer = await db.prepare("SELECT * FROM users WHERE id = ?").get(updated.buyer_id);
     notificationService.notify(buyer, {
       type: "request_declined",
       title: "❌ Request Declined",
@@ -108,26 +102,26 @@ function respondToRequest(requestId, sellerId, decision, deliveryDay) {
   return updated;
 }
 
-function confirmDelivered(requestId, buyerId) {
-  const request = getRequestRaw(requestId);
+async function confirmDelivered(requestId, buyerId) {
+  const request = await getRequestRaw(requestId);
   if (!request) throw new HttpError(404, "Request not found");
   if (request.buyer_id !== buyerId) throw new HttpError(403, "Only the buyer can confirm delivery.");
   if (request.status !== "accepted") throw new HttpError(409, "This request isn't in an accepted state.");
 
-  db.prepare(`UPDATE requests SET status = 'delivered', delivered_confirmed_at = datetime('now') WHERE id = ?`).run(requestId);
+  await db.prepare(`UPDATE requests SET status = 'delivered', delivered_confirmed_at = datetime('now') WHERE id = ?`).run(requestId);
   
   // Stock was reserved at request time. If quantity is 0, we can safely mark as claimed.
-  const listingItem = db.prepare("SELECT * FROM listings WHERE id = ?").get(request.listing_id);
+  const listingItem = await db.prepare("SELECT * FROM listings WHERE id = ?").get(request.listing_id);
   if (listingItem.quantity <= 0) {
-    db.prepare(`UPDATE listings SET status = 'claimed', updated_at = datetime('now') WHERE id = ?`).run(request.listing_id);
+    await db.prepare(`UPDATE listings SET status = 'claimed', updated_at = datetime('now') WHERE id = ?`).run(request.listing_id);
   }
 
-  const listing = db.prepare("SELECT l.*, u.* FROM listings l JOIN users u ON u.id = l.seller_id WHERE l.id = ?").get(request.listing_id);
+  const listing = await db.prepare("SELECT l.*, u.* FROM listings l JOIN users u ON u.id = l.seller_id WHERE l.id = ?").get(request.listing_id);
   const FLAT_FEE = 3;
-  db.prepare(`INSERT INTO fee_ledger (id, request_id, seller_id, amount) VALUES (?, ?, ?, ?)`).run(uuid(), requestId, listing.seller_id, FLAT_FEE);
+  await db.prepare(`INSERT INTO fee_ledger (id, request_id, seller_id, amount) VALUES (?, ?, ?, ?)`).run(uuid(), requestId, listing.seller_id, FLAT_FEE);
 
   // Notify seller
-  const seller = db.prepare("SELECT * FROM users WHERE id = ?").get(listing.seller_id);
+  const seller = await db.prepare("SELECT * FROM users WHERE id = ?").get(listing.seller_id);
   notificationService.notify(seller, {
     type: "delivery_confirmed",
     title: "🎉 Delivery Confirmed!",
@@ -142,18 +136,18 @@ function confirmDelivered(requestId, buyerId) {
 // FLOW B: Broadcast Inquiry (v2.0 NEW)
 // =============================================
 
-function createInquiry(buyerId, { itemQuery, category, neededByDate, maxBudget, notes }) {
+async function createInquiry(buyerId, { itemQuery, category, neededByDate, maxBudget, notes }) {
   if (!itemQuery || itemQuery.trim().length < 2) throw new HttpError(400, "Please describe what you're looking for.");
 
   const id = uuid();
   const expiresAt = new Date(Date.now() + INQUIRY_WINDOW_MS).toISOString();
 
-  db.prepare(
+  await db.prepare(
     `INSERT INTO inquiries (id, buyer_id, item_query, category, needed_by_date, max_budget, notes, status, expires_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)`
   ).run(id, buyerId, itemQuery.trim(), category || "Any", neededByDate || null, maxBudget || 0, notes || "", expiresAt);
 
-  const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(buyerId);
+  const buyer = await db.prepare("SELECT * FROM users WHERE id = ?").get(buyerId);
 
   // Find ALL sellers with matching available listings
   let sellerQuery = `
@@ -170,7 +164,7 @@ function createInquiry(buyerId, { itemQuery, category, neededByDate, maxBudget, 
     params.push(category);
   }
 
-  const matchingSellers = db.prepare(sellerQuery).all(...params);
+  const matchingSellers = await db.prepare(sellerQuery).all(...params);
 
   // Filter by keyword relevance
   const queryWords = itemQuery.toLowerCase().split(/\s+/).filter(w => w.length > 2);
@@ -208,24 +202,24 @@ function createInquiry(buyerId, { itemQuery, category, neededByDate, maxBudget, 
   return { id, notifiedCount };
 }
 
-function respondToInquiry(inquiryId, sellerId, { listingId, availableFrom, priceOffer, message }) {
-  const inquiry = db.prepare("SELECT * FROM inquiries WHERE id = ?").get(inquiryId);
+async function respondToInquiry(inquiryId, sellerId, { listingId, availableFrom, priceOffer, message }) {
+  const inquiry = await db.prepare("SELECT * FROM inquiries WHERE id = ?").get(inquiryId);
   if (!inquiry) throw new HttpError(404, "Inquiry not found.");
   if (inquiry.status !== "open") throw new HttpError(409, "This inquiry has already been matched or expired.");
   if (inquiry.buyer_id === sellerId) throw new HttpError(400, "You can't respond to your own inquiry.");
 
   // Check if this seller already responded
-  const existing = db.prepare("SELECT id FROM inquiry_responses WHERE inquiry_id = ? AND seller_id = ?").get(inquiryId, sellerId);
+  const existing = await db.prepare("SELECT id FROM inquiry_responses WHERE inquiry_id = ? AND seller_id = ?").get(inquiryId, sellerId);
   if (existing) throw new HttpError(409, "You have already responded to this inquiry.");
 
   const responseId = uuid();
-  db.prepare(
+  await db.prepare(
     `INSERT INTO inquiry_responses (id, inquiry_id, seller_id, listing_id, available_from, price_offer, message, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`
   ).run(responseId, inquiryId, sellerId, listingId || null, availableFrom || null, priceOffer || 0, message || "");
 
-  const seller = db.prepare("SELECT * FROM users WHERE id = ?").get(sellerId);
-  const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(inquiry.buyer_id);
+  const seller = await db.prepare("SELECT * FROM users WHERE id = ?").get(sellerId);
+  const buyer = await db.prepare("SELECT * FROM users WHERE id = ?").get(inquiry.buyer_id);
 
   // Notify buyer that a seller responded
   notificationService.notify(buyer, {
@@ -238,32 +232,26 @@ function respondToInquiry(inquiryId, sellerId, { listingId, availableFrom, price
   return { responseId, notifiedBuyer: true };
 }
 
-function acceptInquiryResponse(inquiryId, responseId, buyerId) {
-  const tx = db.transaction(() => {
-    const inquiry = db.prepare("SELECT * FROM inquiries WHERE id = ?").get(inquiryId);
+async function acceptInquiryResponse(inquiryId, responseId, buyerId) {
+      const inquiry = await db.prepare("SELECT * FROM inquiries WHERE id = ?").get(inquiryId);
     if (!inquiry) throw new HttpError(404, "Inquiry not found.");
     if (inquiry.buyer_id !== buyerId) throw new HttpError(403, "Only the buyer can accept a response.");
     if (inquiry.status !== "open") throw new HttpError(409, "This inquiry has already been resolved.");
 
-    const response = db.prepare("SELECT * FROM inquiry_responses WHERE id = ?").get(responseId);
+    const response = await db.prepare("SELECT * FROM inquiry_responses WHERE id = ?").get(responseId);
     if (!response) throw new HttpError(404, "Response not found.");
 
     // Mark inquiry as matched
-    db.prepare(`UPDATE inquiries SET status = 'matched', matched_response_id = ? WHERE id = ?`).run(responseId, inquiryId);
-    db.prepare(`UPDATE inquiry_responses SET status = 'accepted' WHERE id = ?`).run(responseId);
+    await db.prepare(`UPDATE inquiries SET status = 'matched', matched_response_id = ? WHERE id = ?`).run(responseId, inquiryId);
+    await db.prepare(`UPDATE inquiry_responses SET status = 'accepted' WHERE id = ?`).run(responseId);
 
     // Decline all other pending responses
-    db.prepare(
+    await db.prepare(
       `UPDATE inquiry_responses SET status = 'declined' WHERE inquiry_id = ? AND id != ? AND status = 'pending'`
     ).run(inquiryId, responseId);
 
-    return response;
-  });
-
-  const response = tx();
-  const inquiry = db.prepare("SELECT * FROM inquiries WHERE id = ?").get(inquiryId);
-  const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(buyerId);
-  const seller = db.prepare("SELECT * FROM users WHERE id = ?").get(response.seller_id);
+  const buyer = await db.prepare("SELECT * FROM users WHERE id = ?").get(buyerId);
+  const seller = await db.prepare("SELECT * FROM users WHERE id = ?").get(response.seller_id);
 
   // Notify seller they were accepted
   notificationService.notify(seller, {
@@ -274,12 +262,12 @@ function acceptInquiryResponse(inquiryId, responseId, buyerId) {
   });
 
   // Notify declined sellers
-  const declinedResponses = db.prepare(
+  const declinedResponses = await db.prepare(
     `SELECT ir.*, u.id as uid FROM inquiry_responses ir JOIN users u ON u.id = ir.seller_id WHERE ir.inquiry_id = ? AND ir.status = 'declined' AND ir.id != ?`
   ).all(inquiryId, responseId);
 
   for (const r of declinedResponses) {
-    const declinedSeller = db.prepare("SELECT * FROM users WHERE id = ?").get(r.seller_id);
+    const declinedSeller = await db.prepare("SELECT * FROM users WHERE id = ?").get(r.seller_id);
     if (declinedSeller) {
       notificationService.notify(declinedSeller, {
         type: "system",
@@ -297,19 +285,19 @@ function acceptInquiryResponse(inquiryId, responseId, buyerId) {
 // SWEEP JOBS
 // =============================================
 
-function sweepExpiredRequests() {
+async function sweepExpiredRequests() {
   const now = Date.now();
 
   // Auto-expire requests where seller didn't respond
-  const stuckNotified = db.prepare(`SELECT * FROM requests WHERE status = 'notified'`).all();
+  const stuckNotified = await db.prepare(`SELECT * FROM requests WHERE status = 'notified'`).all();
   for (const r of stuckNotified) {
     if (now - new Date(r.created_at + "Z").getTime() > RESPONSE_WINDOW_MS) {
-      db.prepare(`UPDATE requests SET status = 'expired', responded_at = datetime('now') WHERE id = ?`).run(r.id);
-      db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = datetime('now') WHERE id = ?`).run(r.listing_id);
+      await db.prepare(`UPDATE requests SET status = 'expired', responded_at = datetime('now') WHERE id = ?`).run(r.id);
+      await db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = datetime('now') WHERE id = ?`).run(r.listing_id);
 
       // Notify buyer
-      const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(r.buyer_id);
-      const listing = db.prepare("SELECT * FROM listings WHERE id = ?").get(r.listing_id);
+      const buyer = await db.prepare("SELECT * FROM users WHERE id = ?").get(r.buyer_id);
+      const listing = await db.prepare("SELECT * FROM listings WHERE id = ?").get(r.listing_id);
       if (buyer && listing) {
         notificationService.notify(buyer, {
           type: "system",
@@ -322,21 +310,21 @@ function sweepExpiredRequests() {
   }
 
   // Auto no-show
-  const stuckAccepted = db.prepare(`SELECT * FROM requests WHERE status = 'accepted'`).all();
+  const stuckAccepted = await db.prepare(`SELECT * FROM requests WHERE status = 'accepted'`).all();
   for (const r of stuckAccepted) {
     if (r.accepted_at && now - new Date(r.accepted_at + "Z").getTime() > NO_SHOW_WINDOW_MS) {
-      db.prepare(`UPDATE requests SET status = 'no_show' WHERE id = ?`).run(r.id);
-      db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = datetime('now') WHERE id = ?`).run(r.listing_id);
+      await db.prepare(`UPDATE requests SET status = 'no_show' WHERE id = ?`).run(r.id);
+      await db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = datetime('now') WHERE id = ?`).run(r.listing_id);
     }
   }
 
   // Auto-expire open inquiries
-  const expiredInquiries = db.prepare(
+  const expiredInquiries = await db.prepare(
     `SELECT * FROM inquiries WHERE status = 'open' AND expires_at < datetime('now')`
   ).all();
   for (const inq of expiredInquiries) {
-    db.prepare(`UPDATE inquiries SET status = 'expired' WHERE id = ?`).run(inq.id);
-    const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(inq.buyer_id);
+    await db.prepare(`UPDATE inquiries SET status = 'expired' WHERE id = ?`).run(inq.id);
+    const buyer = await db.prepare("SELECT * FROM users WHERE id = ?").get(inq.buyer_id);
     if (buyer) {
       notificationService.notify(buyer, {
         type: "system",
@@ -348,12 +336,12 @@ function sweepExpiredRequests() {
   }
 
   // Auto-expire listings that have passed their 60-day lifetime
-  const expiredListings = db.prepare(
+  const expiredListings = await db.prepare(
     `SELECT * FROM listings WHERE status = 'available' AND expires_at < datetime('now')`
   ).all();
   for (const list of expiredListings) {
-    db.prepare(`UPDATE listings SET status = 'expired', updated_at = datetime('now') WHERE id = ?`).run(list.id);
-    const seller = db.prepare("SELECT * FROM users WHERE id = ?").get(list.seller_id);
+    await db.prepare(`UPDATE listings SET status = 'expired', updated_at = datetime('now') WHERE id = ?`).run(list.id);
+    const seller = await db.prepare("SELECT * FROM users WHERE id = ?").get(list.seller_id);
     if (seller) {
       notificationService.notify(seller, {
         type: "system",
@@ -369,15 +357,15 @@ function sweepExpiredRequests() {
 // HELPERS
 // =============================================
 
-function getRequest(id) {
-  return db.prepare(
+async function getRequest(id) {
+  return await db.prepare(
     `SELECT r.*, l.item_name, l.seller_id, l.price
      FROM requests r JOIN listings l ON l.id = r.listing_id WHERE r.id = ?`
   ).get(id);
 }
 
-function getRequestRaw(id) {
-  return db.prepare("SELECT * FROM requests WHERE id = ?").get(id);
+async function getRequestRaw(id) {
+  return await db.prepare("SELECT * FROM requests WHERE id = ?").get(id);
 }
 
 class HttpError extends Error {

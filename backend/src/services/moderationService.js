@@ -22,7 +22,7 @@ const SCAM_PATTERNS = [
   /advance payment/i,
 ];
 
-function screenListing(listing, seller) {
+async function screenListing(listing, seller) {
   const flags = [];
   const text = `${listing.item_name} ${listing.description || ""}`;
 
@@ -41,29 +41,29 @@ function screenListing(listing, seller) {
   }
 
   for (const f of flags) {
-    db.prepare(
+    await db.prepare(
       `INSERT INTO flags (id, listing_id, reason, severity, reported_by, status) VALUES (?, ?, ?, ?, 'auto-filter', 'open')`
     ).run(uuid(), listing.id, f.reason, f.severity);
 
     if (f.severity === "high") {
-      db.prepare(`UPDATE listings SET moderation_status = 'flagged' WHERE id = ?`).run(listing.id);
+      await db.prepare(`UPDATE listings SET moderation_status = 'flagged' WHERE id = ?`).run(listing.id);
     }
   }
 
   return flags;
 }
 
-function resolveFlag(flagId, moderatorId, action) {
-  const flag = db.prepare("SELECT * FROM flags WHERE id = ?").get(flagId);
+async function resolveFlag(flagId, moderatorId, action) {
+  const flag = await db.prepare("SELECT * FROM flags WHERE id = ?").get(flagId);
   if (!flag) return null;
 
   const status = action === "remove" ? "removed" : "cleared";
-  db.prepare(`UPDATE flags SET status = ?, resolved_at = datetime('now'), resolved_by = ? WHERE id = ?`).run(status, moderatorId, flagId);
+  await db.prepare(`UPDATE flags SET status = ?, resolved_at = datetime('now'), resolved_by = ? WHERE id = ?`).run(status, moderatorId, flagId);
 
   if (action === "remove") {
-    db.prepare(`UPDATE listings SET status = 'removed', moderation_status = 'removed' WHERE id = ?`).run(flag.listing_id);
+    await db.prepare(`UPDATE listings SET status = 'removed', moderation_status = 'removed' WHERE id = ?`).run(flag.listing_id);
   } else {
-    db.prepare(`UPDATE listings SET moderation_status = 'clear' WHERE id = ?`).run(flag.listing_id);
+    await db.prepare(`UPDATE listings SET moderation_status = 'clear' WHERE id = ?`).run(flag.listing_id);
   }
 
   return flag;

@@ -24,16 +24,16 @@ async function register({ name, email, phone, department, year, usn, id_photo_da
   }
 
 
-  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email.toLowerCase());
+  const existing = await db.prepare("SELECT id FROM users WHERE email = ?").get(email.toLowerCase());
   if (existing) throw httpError(409, "An account with this email already exists.");
 
-  const existingUsn = db.prepare("SELECT id FROM users WHERE usn = ?").get(usn.trim().toUpperCase());
+  const existingUsn = await db.prepare("SELECT id FROM users WHERE usn = ?").get(usn.trim().toUpperCase());
   if (existingUsn) throw httpError(409, "This USN/Roll number is already registered.");
 
   const password_hash = await bcrypt.hash(password, 10);
   const id = uuid();
 
-  db.prepare(
+  await db.prepare(
     `INSERT INTO users (id, name, email, phone, department, year, usn, id_photo_data, password_hash, verified, admin_verified)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`
   ).run(
@@ -49,7 +49,7 @@ async function register({ name, email, phone, department, year, usn, id_photo_da
   );
 
   // Notify admins about new pending verification
-  const admins = db.prepare("SELECT * FROM users WHERE role = 'admin'").all();
+  const admins = await db.prepare("SELECT * FROM users WHERE role = 'admin'").all();
   const notificationService = require("./notificationService");
   for (const admin of admins) {
     notificationService.notify(admin, {
@@ -65,7 +65,7 @@ async function register({ name, email, phone, department, year, usn, id_photo_da
 }
 
 async function login(email, password) {
-  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email.toLowerCase().trim());
+  const user = await db.prepare("SELECT * FROM users WHERE email = ?").get(email.toLowerCase().trim());
   if (!user) throw httpError(401, "Invalid email or password.");
   if (user.suspended) throw httpError(403, "This account has been suspended. Contact admin.");
 
@@ -76,7 +76,7 @@ async function login(email, password) {
 }
 
 async function changePassword(userId, currentPassword, newPassword) {
-  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
+  const user = await db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
   if (!user) throw httpError(404, "User not found.");
 
   const ok = await bcrypt.compare(currentPassword, user.password_hash);
@@ -84,7 +84,7 @@ async function changePassword(userId, currentPassword, newPassword) {
   if (newPassword.length < 8) throw httpError(400, "New password must be at least 8 characters.");
 
   const password_hash = await bcrypt.hash(newPassword, 10);
-  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(password_hash, userId);
+  await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(password_hash, userId);
   return { ok: true };
 }
 

@@ -27,10 +27,10 @@ async function sendViaTwilio(user, payload) {
 /**
  * Persist notification to the database (always runs, regardless of provider).
  */
-function persistNotification(userId, payload) {
+async function persistNotification(userId, payload) {
   const id = uuid();
   const title = payload.title || payload.type.replace(/_/g, " ");
-  db.prepare(
+  await db.prepare(
     `INSERT INTO notifications (id, user_id, type, title, message, data_json)
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run(id, userId, payload.type, title, payload.message, JSON.stringify(payload.data || {}));
@@ -38,15 +38,15 @@ function persistNotification(userId, payload) {
 }
 
 /**
- * Main notify function — persists + pushes via SSE + logs to console.
+ * Main notify function ?" persists + pushes via SSE + logs to console.
  */
 async function notify(user, payload) {
   // Always persist to DB
-  const notification = persistNotification(user.id, payload);
+  const notification = await persistNotification(user.id, payload);
 
   // Always push via SSE (instant in-app delivery)
-  const breakdown = getUnreadBreakdown(user.id);
-  const count = getUnreadCount(user.id);
+  const breakdown = await getUnreadBreakdown(user.id);
+  const count = await getUnreadCount(user.id);
   
   sseService.send(user.id, {
     type: "notification",
@@ -66,30 +66,30 @@ async function notify(user, payload) {
 /**
  * Get all notifications for a user.
  */
-function getNotifications(userId, { unreadOnly = false, limit = 50 } = {}) {
+async function getNotifications(userId, { unreadOnly = false, limit = 50 } = {}) {
   let q = `SELECT * FROM notifications WHERE user_id = ?`;
   if (unreadOnly) q += ` AND read = 0`;
   q += ` ORDER BY created_at DESC LIMIT ?`;
-  return db.prepare(q).all(userId, limit);
+  return await db.prepare(q).all(userId, limit);
 }
 
 /**
  * Mark one or all notifications as read.
  */
-function markRead(userId, notificationId) {
+async function markRead(userId, notificationId) {
   if (notificationId === "all") {
-    db.prepare(`UPDATE notifications SET read = 1 WHERE user_id = ?`).run(userId);
+    await db.prepare(`UPDATE notifications SET read = 1 WHERE user_id = ?`).run(userId);
   } else {
-    db.prepare(`UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?`).run(notificationId, userId);
+    await db.prepare(`UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?`).run(notificationId, userId);
   }
 }
 
-function getUnreadCount(userId) {
-  return db.prepare(`SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0`).get(userId).count;
+async function getUnreadCount(userId) {
+  return (await db.prepare(`SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0`).get(userId)).count;
 }
 
-function getUnreadBreakdown(userId) {
-  const rows = db.prepare(`SELECT type, COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0 GROUP BY type`).all(userId);
+async function getUnreadBreakdown(userId) {
+  const rows = await db.prepare(`SELECT type, COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0 GROUP BY type`).all(userId);
   const breakdown = {};
   for (const r of rows) breakdown[r.type] = r.count;
   return breakdown;
