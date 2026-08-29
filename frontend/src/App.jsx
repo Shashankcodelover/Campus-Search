@@ -27,6 +27,7 @@ export default function App() {
   const [unreadBreakdown, setUnreadBreakdown] = useState({});
   const [latestToast, setLatestToast] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem("cs_theme") || "dark");
+  const [serverSleeping, setServerSleeping] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -38,8 +39,18 @@ export default function App() {
       clearToken();
       setAuthed(false);
     };
+    const handleSleeping = () => setServerSleeping(true);
+    const handleAwake = () => setServerSleeping(false);
+
     window.addEventListener("auth_error", handleAuthError);
-    return () => window.removeEventListener("auth_error", handleAuthError);
+    window.addEventListener("server_sleeping", handleSleeping);
+    window.addEventListener("server_awake", handleAwake);
+    
+    return () => {
+      window.removeEventListener("auth_error", handleAuthError);
+      window.removeEventListener("server_sleeping", handleSleeping);
+      window.removeEventListener("server_awake", handleAwake);
+    }
   }, []);
 
   // Real-time notification polling
@@ -130,6 +141,25 @@ export default function App() {
       {paymentRequestId && <PaymentModal requestId={paymentRequestId} onClose={() => setPaymentRequestId(null)} onPaymentConfirmed={() => setTab("inbox")} />}
       {listModal && <ListItemModal onClose={() => setListModal(false)} onCreated={() => { setListModal(false); setTab("browse"); }} />}
       <ToastContainer event={latestToast} />
+      
+      {serverSleeping && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+          background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999,
+          color: "white", flexDirection: "column", gap: 16
+        }}>
+          <div className="spinner" style={{ width: 40, height: 40, border: "4px solid rgba(255,255,255,0.3)", borderTop: "4px solid var(--signal)", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
+          <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+          <div style={{ textAlign: "center", maxWidth: "400px" }}>
+            <h3 style={{ margin: "0 0 8px 0", fontSize: "18px" }}>Waking up the server...</h3>
+            <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.8)", margin: 0 }}>
+              Because this app is hosted on Render's free tier, the server goes to sleep after 15 minutes of inactivity. 
+              It usually takes <b>~50 seconds</b> to boot back up. Please hang tight!
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

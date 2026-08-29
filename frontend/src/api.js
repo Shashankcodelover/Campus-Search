@@ -15,23 +15,39 @@ function authHeaders() {
 }
 
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-      ...(options.headers || {}),
-    },
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    if (res.status === 401) {
-      clearToken();
-      window.dispatchEvent(new Event("auth_error"));
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(),
+        ...(options.headers || {}),
+      },
+    });
+    
+    if (res.status === 502 || res.status === 503) {
+      window.dispatchEvent(new Event("server_sleeping"));
+      throw new Error("Server is waking up...");
     }
-    throw new Error(data.error || "Request failed");
+
+    const data = await res.json().catch(() => ({}));
+    
+    if (!res.ok) {
+      if (res.status === 401) {
+        clearToken();
+        window.dispatchEvent(new Event("auth_error"));
+      }
+      throw new Error(data.error || "Request failed");
+    }
+    
+    window.dispatchEvent(new Event("server_awake"));
+    return data;
+  } catch (err) {
+    if (err.message === "Failed to fetch" || err.message === "NetworkError when attempting to fetch resource.") {
+      window.dispatchEvent(new Event("server_sleeping"));
+    }
+    throw err;
   }
-  return data;
 }
 
 export const api = {
