@@ -58,7 +58,7 @@ async function resolveFlag(flagId, moderatorId, action) {
   if (!flag) return null;
 
   const status = action === "remove" ? "removed" : "cleared";
-  await db.prepare(`UPDATE flags SET status = ?, resolved_at = datetime('now'), resolved_by = ? WHERE id = ?`).run(status, moderatorId, flagId);
+  await db.prepare(`UPDATE flags SET status = ?, resolved_at = CURRENT_TIMESTAMP, resolved_by = ? WHERE id = ?`).run(status, moderatorId, flagId);
 
   if (action === "remove") {
     await db.prepare(`UPDATE listings SET status = 'removed', moderation_status = 'removed' WHERE id = ?`).run(flag.listing_id);

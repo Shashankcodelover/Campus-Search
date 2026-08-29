@@ -61,7 +61,7 @@ router.post("/confirm/:intentId", requireAuth, async (req, res) => {
   if (intent.buyer_id !== req.user.id) return res.status(403).json({ error: "Only buyer can confirm payment." });
 
   await db.prepare(
-    `UPDATE payment_intents SET status = 'paid', paid_at = datetime('now') WHERE id = ?`
+    `UPDATE payment_intents SET status = 'paid', paid_at = CURRENT_TIMESTAMP WHERE id = ?`
   ).run(req.params.intentId);
 
   // Notify seller of payment completion

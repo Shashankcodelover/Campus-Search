@@ -42,7 +42,7 @@ async function createRequest(listingId, buyerId, quantity = 1) {
 
     const newQty = listing.quantity - quantity;
     const newStatus = newQty > 0 ? "available" : "pending";
-    await db.prepare(`UPDATE listings SET quantity = ?, status = ?, updated_at = datetime('now') WHERE id = ?`).run(newQty, newStatus, listingId);
+    await db.prepare(`UPDATE listings SET quantity = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(newQty, newStatus, listingId);
     
     return id;
 
@@ -72,11 +72,11 @@ async function respondToRequest(requestId, sellerId, decision, deliveryDay) {
     if (decision === "accept") {
       if (!deliveryDay) throw new HttpError(400, "A delivery day is required to accept.");
       await db.prepare(
-        `UPDATE requests SET status = 'accepted', delivery_day = ?, accepted_at = datetime('now'), responded_at = datetime('now') WHERE id = ?`
+        `UPDATE requests SET status = 'accepted', delivery_day = ?, accepted_at = CURRENT_TIMESTAMP, responded_at = CURRENT_TIMESTAMP WHERE id = ?`
       ).run(deliveryDay, requestId);
     } else {
-      await db.prepare(`UPDATE requests SET status = 'declined', responded_at = datetime('now') WHERE id = ?`).run(requestId);
-      await db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = datetime('now') WHERE id = ?`).run(request.listing_id);
+      await db.prepare(`UPDATE requests SET status = 'declined', responded_at = CURRENT_TIMESTAMP WHERE id = ?`).run(requestId);
+      await db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(request.listing_id);
     }
   const updated = await getRequest(requestId);
 
@@ -108,12 +108,12 @@ async function confirmDelivered(requestId, buyerId) {
   if (request.buyer_id !== buyerId) throw new HttpError(403, "Only the buyer can confirm delivery.");
   if (request.status !== "accepted") throw new HttpError(409, "This request isn't in an accepted state.");
 
-  await db.prepare(`UPDATE requests SET status = 'delivered', delivered_confirmed_at = datetime('now') WHERE id = ?`).run(requestId);
+  await db.prepare(`UPDATE requests SET status = 'delivered', delivered_confirmed_at = CURRENT_TIMESTAMP WHERE id = ?`).run(requestId);
   
   // Stock was reserved at request time. If quantity is 0, we can safely mark as claimed.
   const listingItem = await db.prepare("SELECT * FROM listings WHERE id = ?").get(request.listing_id);
   if (listingItem.quantity <= 0) {
-    await db.prepare(`UPDATE listings SET status = 'claimed', updated_at = datetime('now') WHERE id = ?`).run(request.listing_id);
+    await db.prepare(`UPDATE listings SET status = 'claimed', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(request.listing_id);
   }
 
   const listing = await db.prepare("SELECT l.*, u.* FROM listings l JOIN users u ON u.id = l.seller_id WHERE l.id = ?").get(request.listing_id);
@@ -292,8 +292,8 @@ async function sweepExpiredRequests() {
   const stuckNotified = await db.prepare(`SELECT * FROM requests WHERE status = 'notified'`).all();
   for (const r of stuckNotified) {
     if (now - new Date(r.created_at + "Z").getTime() > RESPONSE_WINDOW_MS) {
-      await db.prepare(`UPDATE requests SET status = 'expired', responded_at = datetime('now') WHERE id = ?`).run(r.id);
-      await db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = datetime('now') WHERE id = ?`).run(r.listing_id);
+      await db.prepare(`UPDATE requests SET status = 'expired', responded_at = CURRENT_TIMESTAMP WHERE id = ?`).run(r.id);
+      await db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(r.listing_id);
 
       // Notify buyer
       const buyer = await db.prepare("SELECT * FROM users WHERE id = ?").get(r.buyer_id);
@@ -314,13 +314,13 @@ async function sweepExpiredRequests() {
   for (const r of stuckAccepted) {
     if (r.accepted_at && now - new Date(r.accepted_at + "Z").getTime() > NO_SHOW_WINDOW_MS) {
       await db.prepare(`UPDATE requests SET status = 'no_show' WHERE id = ?`).run(r.id);
-      await db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = datetime('now') WHERE id = ?`).run(r.listing_id);
+      await db.prepare(`UPDATE listings SET quantity = quantity + 1, status = 'available', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(r.listing_id);
     }
   }
 
   // Auto-expire open inquiries
   const expiredInquiries = await db.prepare(
-    `SELECT * FROM inquiries WHERE status = 'open' AND expires_at < datetime('now')`
+    `SELECT * FROM inquiries WHERE status = 'open' AND expires_at::timestamp < CURRENT_TIMESTAMP`
   ).all();
   for (const inq of expiredInquiries) {
     await db.prepare(`UPDATE inquiries SET status = 'expired' WHERE id = ?`).run(inq.id);
@@ -337,10 +337,10 @@ async function sweepExpiredRequests() {
 
   // Auto-expire listings that have passed their 60-day lifetime
   const expiredListings = await db.prepare(
-    `SELECT * FROM listings WHERE status = 'available' AND expires_at < datetime('now')`
+    `SELECT * FROM listings WHERE status = 'available' AND expires_at::timestamp < CURRENT_TIMESTAMP`
   ).all();
   for (const list of expiredListings) {
-    await db.prepare(`UPDATE listings SET status = 'expired', updated_at = datetime('now') WHERE id = ?`).run(list.id);
+    await db.prepare(`UPDATE listings SET status = 'expired', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(list.id);
     const seller = await db.prepare("SELECT * FROM users WHERE id = ?").get(list.seller_id);
     if (seller) {
       notificationService.notify(seller, {
