@@ -1,0 +1,1 @@
+const fs = require('fs'); let c = fs.readFileSync('src/services/matchingService.js', 'utf8'); c = c.replace(/(?<!async\s+)function\s+(\w+)\s*\(([^)]*)\)\s*\{([\s\S]*?)\}/g, (m, n, a, b) => b.includes('await') ? 'async function ' + n + '(' + a + ') {' + b + '}' : m); fs.writeFileSync('src/services/matchingService.js', c);

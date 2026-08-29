@@ -39,6 +39,7 @@ export const api = {
   register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login: (body) => request("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   changePassword: (body) => request("/auth/change-password", { method: "POST", body: JSON.stringify(body) }),
+  resetPassword: (body) => request("/auth/reset-password", { method: "POST", body: JSON.stringify(body) }),
 
   // ---- Listings ----
   getListings: (params = {}) => {

@@ -88,6 +88,26 @@ async function changePassword(userId, currentPassword, newPassword) {
   return { ok: true };
 }
 
+async function resetPassword(email, phone, newPassword) {
+  if (!email || !phone) throw httpError(400, "Email and registered phone number are required.");
+  const user = await db.prepare("SELECT * FROM users WHERE email = ?").get(email.toLowerCase().trim());
+  if (!user) throw httpError(404, "Account not found with this email.");
+  
+  if (user.phone !== phone.trim()) {
+    throw httpError(401, "The phone number does not match our records for this account.");
+  }
+  
+  if (!newPassword || newPassword.length < 8) {
+    throw httpError(400, "New password must be at least 8 characters.");
+  }
+
+  const password_hash = await bcrypt.hash(newPassword, 10);
+  await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(password_hash, user.id);
+  
+  // Return a new token so they are logged in immediately after resetting
+  return { token: issueToken(user.id), requiresVerification: !user.admin_verified };
+}
+
 function issueToken(userId) {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: "30d" });
 }
@@ -102,4 +122,4 @@ function httpError(status, message) {
   return e;
 }
 
-module.exports = { register, login, changePassword, verifyToken, JWT_SECRET };
+module.exports = { register, login, changePassword, resetPassword, verifyToken, JWT_SECRET };

@@ -38,10 +38,15 @@ export function AuthScreen({ onAuthed }) {
         if (!form.usn.trim()) throw new Error("USN / Roll number is required.");
       }
 
-
-      const res = mode === "login"
-        ? await api.login({ email: form.email, password: form.password })
-        : await api.register(form);
+      let res;
+      if (mode === "login") {
+        res = await api.login({ email: form.email, password: form.password });
+      } else if (mode === "forgot") {
+        res = await api.resetPassword({ email: form.email, phone: form.phone, newPassword: form.password });
+        alert("Password reset successfully!");
+      } else {
+        res = await api.register(form);
+      }
 
       setToken(res.token);
       onAuthed();
@@ -52,7 +57,7 @@ export function AuthScreen({ onAuthed }) {
     }
   };
 
-  const handleKeyDown = (e) => { if (e.key === "Enter" && mode === "login") submit(); };
+  const handleKeyDown = (e) => { if (e.key === "Enter" && mode !== "register") submit(); };
 
   return (
     <div className="auth-wrapper">
@@ -67,7 +72,7 @@ export function AuthScreen({ onAuthed }) {
         <div className="auth-card__subtitle">Campus peer-to-peer hardware exchange & verified student identity.</div>
 
         <div className="auth-tabs">
-          <button onClick={() => setMode("login")} className={`auth-tab ${mode === "login" ? "auth-tab--active" : ""}`}>Log in</button>
+          <button onClick={() => setMode("login")} className={`auth-tab ${(mode === "login" || mode === "forgot") ? "auth-tab--active" : ""}`}>Log in</button>
           <button onClick={() => setMode("register")} className={`auth-tab ${mode === "register" ? "auth-tab--active" : ""}`}>Register</button>
         </div>
 
@@ -117,9 +122,20 @@ export function AuthScreen({ onAuthed }) {
             </>
           )}
 
+          {mode === "forgot" && (
+            <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8, padding: "8px", background: "var(--raised)", borderRadius: 6 }}>
+              Enter your registered Email and Phone Number to reset your password.
+            </div>
+          )}
+
           <input className="input" placeholder="Email Address *" value={form.email} onChange={set("email")} id="auth-email" required />
+          
+          {mode === "forgot" && (
+            <input className="input" placeholder="Registered Phone Number *" value={form.phone} onChange={set("phone")} required />
+          )}
+
           <div style={{ position: "relative" }}>
-            <input className="input" type={showPassword ? "text" : "password"} placeholder="Password *" value={form.password} onChange={set("password")} id="auth-password" required style={{ width: "100%", paddingRight: "40px" }} />
+            <input className="input" type={showPassword ? "text" : "password"} placeholder={mode === "forgot" ? "New Password *" : "Password *"} value={form.password} onChange={set("password")} id="auth-password" required style={{ width: "100%", paddingRight: "40px" }} />
             <button 
               type="button" 
               className="btn-ghost" 
@@ -129,12 +145,37 @@ export function AuthScreen({ onAuthed }) {
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
+          
+          {mode === "login" && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "-4px" }}>
+              <button 
+                type="button" 
+                className="btn-ghost" 
+                style={{ fontSize: 12, padding: "2px 4px" }}
+                onClick={() => setMode("forgot")}
+              >
+                Forgot Password?
+              </button>
+            </div>
+          )}
+          {mode === "forgot" && (
+             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "-4px" }}>
+             <button 
+               type="button" 
+               className="btn-ghost" 
+               style={{ fontSize: 12, padding: "2px 4px" }}
+               onClick={() => setMode("login")}
+             >
+               Back to Login
+             </button>
+           </div>
+          )}
         </div>
 
         {error && <div style={{ color: "var(--red)", fontSize: 12.5, marginTop: 10 }}>{error}</div>}
 
         <button onClick={submit} disabled={loading} className="btn btn-primary" style={{ width: "100%", marginTop: 16 }} id="auth-submit">
-          {loading ? "Please wait…" : mode === "login" ? "Log in" : "Register Account"}
+          {loading ? "Please wait…" : mode === "login" ? "Log in" : mode === "forgot" ? "Reset Password" : "Register Account"}
         </button>
 
         <div className="auth-footer" style={{ display: "flex", alignItems: "center", gap: 6 }}>
