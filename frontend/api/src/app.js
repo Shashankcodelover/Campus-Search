@@ -44,9 +44,17 @@ app.use("/api/", limiter);
 // DB init is async with sql.js (WASM), so block requests until DB is ready
 let dbReady = false;
 
-app.use((req, res, next) => {
-  if (dbReady || req.path === "/api/health") return next();
-  res.status(503).json({ error: "Server is starting up, please retry in a moment." });
+let dbInitPromise = null;
+
+app.use(async (req, res, next) => {
+  if (!dbReady && !dbInitPromise) {
+    dbInitPromise = startApp().catch(e => { console.error("DB Init Failed:", e); dbInitPromise = null; });
+  }
+  if (!dbReady) {
+    await dbInitPromise;
+  }
+  next();
+});
 });
 
 // Core routes (v1.0)
@@ -86,3 +94,4 @@ async function startApp() {
 
 module.exports = app;
 module.exports.startApp = startApp;
+
