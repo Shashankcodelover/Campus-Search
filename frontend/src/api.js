@@ -173,3 +173,6 @@ export default api;
 if (typeof window !== "undefined") {
   window.api = api;
 }
+
+// Triggering Vercel rebuild for frozen UI bug fix
+
