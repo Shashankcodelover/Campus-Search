@@ -4,9 +4,7 @@
  *          Notifications (+ SSE), Notion, Wishlists, Profiles, Messages,
  *          Inquiries (Broadcast availability flow), Payments (UPI QR).
  */
-const BASE = import.meta.env.VITE_API_URL
-  ? (import.meta.env.VITE_API_URL.endsWith("/api") ? import.meta.env.VITE_API_URL : `${import.meta.env.VITE_API_URL}/api`)
-  : "/api";
+const BASE = "/api";
 
 
 function authHeaders() {
