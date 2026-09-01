@@ -55,7 +55,6 @@ app.use(async (req, res, next) => {
   }
   next();
 });
-});
 
 // Core routes (v1.0)
 app.use("/api/auth", require("./routes/auth"));
@@ -94,4 +93,5 @@ async function startApp() {
 
 module.exports = app;
 module.exports.startApp = startApp;
+
 
