@@ -122,7 +122,7 @@ export default function App() {
         themeToggle={
           <button className="theme-toggle-btn" onClick={toggleTheme} title="Toggle Light/Dark Theme">
             {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
-            <span>{theme === "dark" ? "Light" : "Dark"}</span>
+            <span className="desktop-only">{theme === "dark" ? "Light" : "Dark"}</span>
           </button>
         }
       />
