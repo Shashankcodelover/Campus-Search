@@ -68,7 +68,7 @@ async function seed() {
   for (const l of listings) {
     db.prepare(
       `INSERT INTO listings (id, seller_id, item_name, category, condition_notes, description, price, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '+60 days'))`
+       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP + INTERVAL '60 days')`
     ).run(uuid(), userIds[l.seller], l.item_name, l.category, l.condition_notes, l.description || "", l.price);
   }
 
@@ -77,7 +77,6 @@ async function seed() {
     { user: "Divya S", item_name: "Motor Driver L298N", category: "Power & Wiring", max_budget: 200, notes: "For robot project, urgent" },
     { user: "Karthik V", item_name: "Oscilloscope (any)", category: "Tools", max_budget: 3000, notes: "Would rent too" },
   ];
-
   for (const w of wishlists) {
     db.prepare(
       `INSERT INTO wishlists (id, user_id, item_name, category, max_budget, notes)
@@ -85,11 +84,11 @@ async function seed() {
     ).run(uuid(), userIds[w.user], w.item_name, w.category, w.max_budget, w.notes);
   }
 
-  // Sample broadcast inquiry
+  // Insert a broadcast inquiry
   const sampleInquiryId = uuid();
   db.prepare(
     `INSERT INTO inquiries (id, buyer_id, item_query, category, needed_by_date, max_budget, notes, status, expires_at)
-     VALUES (?, ?, 'STM32 Nucleo Board', 'Microcontrollers', 'Tomorrow 2 PM', 600, 'Urgent for Lab Exam', 'open', datetime('now', '+2 hours'))`
+     VALUES (?, ?, 'STM32 Nucleo Board', 'Microcontrollers', 'Tomorrow 2 PM', 600, 'Urgent for Lab Exam', 'open', CURRENT_TIMESTAMP + INTERVAL '2 hours')`
   ).run(sampleInquiryId, userIds["Priya M"]);
 
   db.prepare(
@@ -97,14 +96,13 @@ async function seed() {
      VALUES (?, ?, 'system', 'Welcome to CampusSearch v2.0!', 'Browse listings, broadcast availability inquiries, and pay via UPI QR.', '{}')`
   ).run(uuid(), userIds["Aravind K"]);
 
-  db._save();
-
   console.log("\n✅ Seed complete (v2.0).\n");
   console.log("Demo accounts:");
   for (const u of users) {
     console.log(`  ${u.email} / ${PASSWORD} (USN: ${u.usn})${u.role === "admin" ? " [ADMIN]" : ""}${u.admin_verified === 0 ? " [PENDING VERIFICATION]" : ""}`);
   }
-  console.log(`\n${listings.length} listings, ${wishlists.length} wishlists, 1 broadcast inquiry created.\n`);
+  console.log(`\n${listings.length} listings, ${wishlists.length} wishlists, 1 broadcast inquiry created.`);
+  console.log("Database seeded successfully with users and listings!");
 }
 
 seed().catch((e) => {

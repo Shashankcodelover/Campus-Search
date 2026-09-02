@@ -14,10 +14,11 @@ function authHeaders() {
 
 async function request(path, options = {}) {
   try {
+    const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
     const res = await fetch(`${BASE}${path}`, {
       ...options,
       headers: {
-        "Content-Type": "application/json",
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
         ...authHeaders(),
         ...(options.headers || {}),
       },
