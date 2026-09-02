@@ -1,6 +1,6 @@
 import React from "react";
 
-export function StatusDot({ status }) {
+export function StatusDot({ status, qty }) {
   const map = {
     available: "available",
     pending: "pending",
@@ -14,11 +14,18 @@ export function StatusDot({ status }) {
     claimed: "Claimed",
     expired: "Expired"
   };
-  const s = map[status] || "available";
+  let s = map[status] || "available";
+  let label = labels[s] || status;
+
+  if (s === "available" && qty === 1) {
+    s = "pending"; // Use the amber color class
+    label = "1 Left";
+  }
+
   return (
     <span className={`status-dot status-dot--${s}`}>
       <span className="status-dot__circle" />
-      {labels[s] || status}
+      {label}
     </span>
   );
 }

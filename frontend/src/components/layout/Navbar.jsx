@@ -32,7 +32,7 @@ export function Navbar({ tabs, activeTab, setTab, unreadCount, showNotifications
             {themeToggle}
 
             <div className="notification-bell" style={{ position: "relative" }}>
-              <button className="btn-icon" onClick={() => setShowNotifications(!showNotifications)}>
+              <button className="btn-icon" title="Notifications" aria-label="Notifications" onClick={() => setShowNotifications(!showNotifications)}>
                 <Bell size={16} />
               </button>
               {unreadCount > 0 && (
@@ -45,10 +45,10 @@ export function Navbar({ tabs, activeTab, setTab, unreadCount, showNotifications
               <Plus size={14} /> List
             </button>
             
-            <button onClick={onLogout} className="btn-icon desktop-only" title="Log out"><LogOut size={15} /></button>
+            <button onClick={onLogout} className="btn-icon desktop-only" title="Log out" aria-label="Log out"><LogOut size={15} /></button>
 
             {/* Mobile Menu Toggle */}
-            <button className="btn-icon mobile-only" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            <button className="btn-icon mobile-only" title="Toggle Menu" aria-label="Toggle Menu" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
@@ -61,7 +61,7 @@ export function Navbar({ tabs, activeTab, setTab, unreadCount, showNotifications
           <div className="mobile-menu-panel card" onClick={(e) => e.stopPropagation()}>
             <div className="mobile-menu-header">
               <h3 style={{ fontSize: 16 }}>Menu</h3>
-              <button className="btn-icon" onClick={() => setMobileMenuOpen(false)}><X size={18} /></button>
+              <button className="btn-icon" title="Close Menu" aria-label="Close Menu" onClick={() => setMobileMenuOpen(false)}><X size={18} /></button>
             </div>
             <div className="mobile-menu-content">
               {tabs.map((t) => (

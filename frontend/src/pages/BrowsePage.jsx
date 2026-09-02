@@ -17,7 +17,7 @@ const CATEGORY_IMAGES = {
   "Power & Wiring": "https://images.unsplash.com/photo-1555664424-778a1e5e1b48?auto=format&fit=crop&w=400&q=80",
   Tools: "https://images.unsplash.com/photo-1581092162384-8987c1d64718?auto=format&fit=crop&w=400&q=80",
   "Full Kits": "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=400&q=80",
-  "Passive Components": "https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?auto=format&fit=crop&w=400&q=80",
+  "Passive Components": "https://images.unsplash.com/photo-1608564697071-fe8a8034db3f?auto=format&fit=crop&w=400&q=80",
 };
 
 export function BrowsePage({ onRequestListing }) {
@@ -92,32 +92,32 @@ export function BrowsePage({ onRequestListing }) {
             <option value="popular">Most Viewed</option>
           </select>
           <div style={{ display: "flex", gap: 2 }}>
-            <button className={`btn-icon ${viewMode === "grid" ? "btn-primary" : ""}`} onClick={() => setViewMode("grid")} style={viewMode === "grid" ? { background: "var(--signal)", color: "var(--bg-deep)", border: "none" } : {}}><Grid3X3 size={14} /></button>
-            <button className={`btn-icon ${viewMode === "list" ? "btn-primary" : ""}`} onClick={() => setViewMode("list")} style={viewMode === "list" ? { background: "var(--signal)", color: "var(--bg-deep)", border: "none" } : {}}><List size={14} /></button>
+            <button title="Grid View" aria-label="Grid View" className={`btn-icon ${viewMode === "grid" ? "btn-primary" : ""}`} onClick={() => setViewMode("grid")} style={viewMode === "grid" ? { background: "var(--signal)", color: "var(--bg-deep)", border: "none" } : {}}><Grid3X3 size={14} /></button>
+            <button title="List View" aria-label="List View" className={`btn-icon ${viewMode === "list" ? "btn-primary" : ""}`} onClick={() => setViewMode("list")} style={viewMode === "list" ? { background: "var(--signal)", color: "var(--bg-deep)", border: "none" } : {}}><List size={14} /></button>
           </div>
         </div>
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 20 }}>
         <button
-          className={`btn ${category === "All" ? "btn-primary" : "btn-ghost"}`}
-          style={{ padding: "6px 14px", fontSize: 12, flexShrink: 0 }}
+          className={`btn btn-sm ${category === "All" ? "btn-primary" : "btn-ghost"}`}
           onClick={() => setCategory("All")}
+          style={{ flexShrink: 0 }}
         >All</button>
         {CATEGORIES.map((c) => (
           <button
             key={c}
-            className={`btn ${category === c ? "btn-primary" : "btn-ghost"}`}
-            style={{ padding: "6px 14px", fontSize: 12, flexShrink: 0 }}
+            className={`btn btn-sm ${category === c ? "btn-primary" : "btn-ghost"}`}
             onClick={() => setCategory(c)}
+            style={{ flexShrink: 0 }}
           >
             {CATEGORY_ICONS[c]} {c}
           </button>
         ))}
         <button
-          className={`btn ${freeOnly ? "btn-primary" : "btn-ghost"}`}
-          style={{ padding: "6px 14px", fontSize: 12, flexShrink: 0, border: freeOnly ? "none" : "1px dashed var(--signal)", color: freeOnly ? "var(--bg-deep)" : "var(--signal)" }}
+          className={`btn btn-sm ${freeOnly ? "btn-primary" : "btn-ghost"}`}
           onClick={() => setFreeOnly(!freeOnly)}
+          style={{ flexShrink: 0 }}
         >
           🎁 Free / Giveaway (₹0)
         </button>
@@ -172,7 +172,7 @@ export function BrowsePage({ onRequestListing }) {
                   <Heart size={15} fill={favorites.some(f => f.id === l.id) ? "var(--red)" : "none"} />
                 </button>
                 <div style={{ position: "absolute", top: 8, right: 8 }}>
-                  <StatusDot status={l.status} />
+                  <StatusDot status={l.status} qty={l.quantity} />
                 </div>
               </div>
               <div className="listing-card__body" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -187,30 +187,25 @@ export function BrowsePage({ onRequestListing }) {
                 <div className="listing-card__meta" style={{ marginBottom: 12 }}>
                   <Badge tone="muted">{l.category}</Badge>
                   {l.listing_type === "rent" && <Badge tone="primary">RENTAL</Badge>}
-                  <span style={{ fontSize: 11 }}>{l.condition_notes}</span>
-                  <span style={{ fontSize: 11, fontWeight: "600", color: l.quantity === 1 ? "var(--amber)" : "var(--signal)", marginLeft: "auto" }}>
-                    Stock: {l.quantity || 1} unit{(l.quantity || 1) !== 1 ? "s" : ""}
-                  </span>
+                  <span style={{ fontSize: 12 }}>{l.condition_notes}</span>
                 </div>
 
 
-                <div className="listing-card__footer" style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--trace)" }}>
+                <div className="listing-card__footer" style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--trace)", paddingBottom: 10 }}>
                   <div className="listing-card__seller">
                     <Avatar name={l.seller_name} size="sm" />
                     <span style={{ fontSize: 12 }}>{l.seller_name}</span>
                     {l.seller_verified ? <CheckCircle size={14} color="var(--signal)" /> : null}
                   </div>
-                  
-                  {l.status === "available" && (
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => onRequestListing(l)}
-                      style={{ padding: "4px 10px", fontSize: 12 }}
-                    >
-                      Request
-                    </button>
-                  )}
                 </div>
+                {l.status === "available" && (
+                  <button
+                    className="btn btn-primary btn-block"
+                    onClick={() => onRequestListing(l)}
+                  >
+                    Request Item
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -236,9 +231,9 @@ export function BrowsePage({ onRequestListing }) {
                 <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>{l.condition_notes} · {l.seller_name}, {l.seller_department}</div>
               </div>
               <span className="font-mono row-price" style={{ fontSize: 14, justifySelf: "end" }}>{l.price === 0 ? "Free" : `₹${l.price}`}</span>
-              <span className="row-status" style={{ justifySelf: "end" }}><StatusDot status={l.status} /></span>
+              <span className="row-status" style={{ justifySelf: "end" }}><StatusDot status={l.status} qty={l.quantity} /></span>
               <span className="row-action" style={{ justifySelf: "end" }}>
-                <button disabled={l.status !== "available"} className="btn btn-ghost" style={{ padding: "7px 12px", fontSize: 12 }}>
+                <button disabled={l.status !== "available"} className="btn btn-ghost btn-sm">
                   {l.status === "available" ? "Request" : l.status}
                 </button>
               </span>
