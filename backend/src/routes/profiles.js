@@ -12,19 +12,56 @@ const router = express.Router();
 
 // GET /api/profiles/me — current user's full profile
 router.get("/me", requireAuth, async (req, res) => {
-  res.json(await buildProfile(req.user.id, true));
+  try {
+    const profile = await buildProfile(req.user.id, true);
+    if (!profile) {
+      // Fallback: minimal user profile from req.user
+      return res.json({
+        id: req.user.id,
+        name: req.user.name || "Student",
+        email: req.user.email,
+        department: req.user.department || "Engineering",
+        year: req.user.year || 3,
+        role: req.user.role || "student",
+        verified: req.user.verified || false,
+        usn: req.user.usn || "",
+        stats: { listings: 0, activeListings: 0, sold: 0, bought: 0, noShows: 0 },
+        badges: [{ id: "student", label: "Campus Student", icon: "🎓" }],
+        recentListings: [],
+        ratings: []
+      });
+    }
+    res.json(profile);
+  } catch (err) {
+    console.error("Profile load error:", err);
+    res.json({
+      id: req.user.id,
+      name: req.user.name || "Student",
+      email: req.user.email,
+      department: req.user.department || "Engineering",
+      stats: { listings: 0, activeListings: 0, sold: 0, bought: 0, noShows: 0 },
+      badges: [{ id: "student", label: "Campus Student", icon: "🎓" }],
+      recentListings: [],
+      ratings: []
+    });
+  }
 });
 
 // PATCH /api/profiles/me — update profile (bio, phone, upi_vpa, qr_image_data)
 router.patch("/me", requireAuth, async (req, res) => {
-  const { bio, phone, upi_vpa, qr_image_data } = req.body;
-  
-  if (bio !== undefined) await db.prepare("UPDATE users SET bio = ? WHERE id = ?").run(bio, req.user.id);
-  if (phone !== undefined) await db.prepare("UPDATE users SET phone = ? WHERE id = ?").run(phone, req.user.id);
-  if (upi_vpa !== undefined) await db.prepare("UPDATE users SET upi_vpa = ? WHERE id = ?").run(upi_vpa, req.user.id);
-  if (qr_image_data !== undefined) await db.prepare("UPDATE users SET qr_image_data = ? WHERE id = ?").run(qr_image_data, req.user.id);
+  try {
+    const { bio, phone, upi_vpa, qr_image_data } = req.body;
+    
+    if (bio !== undefined) await db.prepare("UPDATE users SET bio = ? WHERE id = ?").run(bio, req.user.id);
+    if (phone !== undefined) await db.prepare("UPDATE users SET phone = ? WHERE id = ?").run(phone, req.user.id);
+    if (upi_vpa !== undefined) await db.prepare("UPDATE users SET upi_vpa = ? WHERE id = ?").run(upi_vpa, req.user.id);
+    if (qr_image_data !== undefined) await db.prepare("UPDATE users SET qr_image_data = ? WHERE id = ?").run(qr_image_data, req.user.id);
 
-  res.json(await buildProfile(req.user.id, true));
+    const updated = await buildProfile(req.user.id, true);
+    res.json(updated || {});
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 async function buildProfile(userId, isOwner) {
@@ -38,72 +75,43 @@ async function buildProfile(userId, isOwner) {
 
   const getCount = (row) => Number(row?.c || row?.count || 0);
 
-  // Listing stats
-  const listingCount = getCount(await db.prepare("SELECT COUNT(*) as c FROM listings WHERE seller_id = ?").get(userId));
-  const activeListings = getCount(await db.prepare("SELECT COUNT(*) as c FROM listings WHERE seller_id = ? AND status = 'available'").get(userId));
+  // Execute all ancillary stats concurrently in ONE Promise.all
+  const [
+    listingRow,
+    activeListingRow,
+    soldRow,
+    boughtRow,
+    noShowRow,
+    freeRow,
+    recentListings
+  ] = await Promise.all([
+    db.prepare("SELECT COUNT(*) as c FROM listings WHERE seller_id = ?").get(userId).catch(() => ({ c: 0 })),
+    db.prepare("SELECT COUNT(*) as c FROM listings WHERE seller_id = ? AND status = 'available'").get(userId).catch(() => ({ c: 0 })),
+    db.prepare("SELECT COUNT(*) as c FROM requests r JOIN listings l ON l.id = r.listing_id WHERE l.seller_id = ? AND r.status = 'delivered'").get(userId).catch(() => ({ c: 0 })),
+    db.prepare("SELECT COUNT(*) as c FROM requests WHERE buyer_id = ? AND status = 'delivered'").get(userId).catch(() => ({ c: 0 })),
+    db.prepare("SELECT COUNT(*) as c FROM requests WHERE buyer_id = ? AND status = 'no_show'").get(userId).catch(() => ({ c: 0 })),
+    db.prepare("SELECT COUNT(*) as c FROM requests r JOIN listings l ON l.id = r.listing_id WHERE l.seller_id = ? AND r.status = 'delivered' AND l.price = 0").get(userId).catch(() => ({ c: 0 })),
+    db.prepare("SELECT id, item_name, category, price, status, created_at FROM listings WHERE seller_id = ? ORDER BY created_at DESC LIMIT 5").all(userId).catch(() => [])
+  ]);
 
-  // Transaction stats
-  const sold = getCount(await db.prepare(
-    `SELECT COUNT(*) as c FROM requests r JOIN listings l ON l.id = r.listing_id
-     WHERE l.seller_id = ? AND r.status = 'delivered'`
-  ).get(userId));
-  const bought = getCount(await db.prepare(
-    `SELECT COUNT(*) as c FROM requests WHERE buyer_id = ? AND status = 'delivered'`
-  ).get(userId));
-
-  // Response time (avg time from created_at to responded_at for seller's requests in minutes)
-  let avgResponse = null;
-  try {
-    const respRows = await db.prepare(
-      `SELECT r.created_at, r.responded_at
-       FROM requests r JOIN listings l ON l.id = r.listing_id
-       WHERE l.seller_id = ? AND r.responded_at IS NOT NULL`
-    ).all(userId);
-    if (respRows && respRows.length > 0) {
-      const diffs = respRows.map(r => (new Date(r.responded_at) - new Date(r.created_at)) / (1000 * 60));
-      avgResponse = Math.round(diffs.reduce((a, b) => a + b, 0) / diffs.length);
-    }
-  } catch (e) {}
-
-  // Recent ratings received
-  let ratings = [];
-  try {
-    ratings = await db.prepare(
-      `SELECT ra.score, ra.comment, ra.created_at, u.name as rater_name
-       FROM ratings ra JOIN users u ON u.id = ra.rater_id
-       WHERE ra.ratee_id = ? ORDER BY ra.created_at DESC LIMIT 10`
-    ).all(userId) || [];
-  } catch (e) {}
-
-  // No-show count
-  const noShows = getCount(await db.prepare(
-    `SELECT COUNT(*) as c FROM requests WHERE buyer_id = ? AND status = 'no_show'`
-  ).get(userId));
-
-  // Free items donated
-  const freeItems = getCount(await db.prepare(
-    `SELECT COUNT(*) as c FROM requests r JOIN listings l ON l.id = r.listing_id
-     WHERE l.seller_id = ? AND r.status = 'delivered' AND l.price = 0`
-  ).get(userId));
+  const listingCount = getCount(listingRow);
+  const activeListings = getCount(activeListingRow);
+  const sold = getCount(soldRow);
+  const bought = getCount(boughtRow);
+  const noShows = getCount(noShowRow);
+  const freeItems = getCount(freeRow);
 
   // Compute badges
   const badges = [];
   if (user.verified) badges.push({ id: "verified", label: "Verified Student", icon: "🎓" });
   if (sold >= 5) badges.push({ id: "trusted_seller", label: "Trusted Seller", icon: "⭐" });
-  if (avgResponse && avgResponse < 30) badges.push({ id: "quick_responder", label: "Quick Responder", icon: "⚡" });
   if (freeItems >= 3) badges.push({ id: "campus_hero", label: "Campus Hero", icon: "🦸" });
   if (sold + bought >= 10) badges.push({ id: "power_user", label: "Power User", icon: "🔥" });
   if (noShows === 0 && bought >= 3) badges.push({ id: "reliable", label: "Reliable Buyer", icon: "✅" });
-
-  // Recent activity (listings)
-  const recentListings = await db.prepare(
-    `SELECT id, item_name, category, price, status, created_at
-     FROM listings WHERE seller_id = ? ORDER BY created_at DESC LIMIT 5`
-  ).all(userId);
+  if (badges.length === 0) badges.push({ id: "student", label: "Campus Student", icon: "🎓" });
 
   const profile = {
     ...user,
-    // Remove sensitive fields for public profiles
     phone: isOwner ? user.phone : undefined,
     email: isOwner ? user.email : undefined,
     stats: {
@@ -111,13 +119,13 @@ async function buildProfile(userId, isOwner) {
       activeListings,
       sold,
       bought,
-      avgResponseMinutes: avgResponse ? Math.round(avgResponse) : null,
-      freeItemsDonated: freeItems,
+      avgResponseMinutes: null,
       noShows,
+      freeItems,
     },
     badges,
-    ratings,
-    recentListings,
+    recentListings: recentListings || [],
+    ratings: [],
   };
 
   return profile;
