@@ -34,46 +34,57 @@ async function buildProfile(userId, isOwner) {
      FROM users WHERE id = ?`
   ).get(userId);
 
+  if (!user) return null;
+
+  const getCount = (row) => Number(row?.c || row?.count || 0);
 
   // Listing stats
-  const listingCount = await db.prepare("SELECT COUNT(*) as c FROM listings WHERE seller_id = ?").get(userId).c;
-  const activeListings = await db.prepare("SELECT COUNT(*) as c FROM listings WHERE seller_id = ? AND status = 'available'").get(userId).c;
+  const listingCount = getCount(await db.prepare("SELECT COUNT(*) as c FROM listings WHERE seller_id = ?").get(userId));
+  const activeListings = getCount(await db.prepare("SELECT COUNT(*) as c FROM listings WHERE seller_id = ? AND status = 'available'").get(userId));
 
   // Transaction stats
-  const sold = await db.prepare(
+  const sold = getCount(await db.prepare(
     `SELECT COUNT(*) as c FROM requests r JOIN listings l ON l.id = r.listing_id
      WHERE l.seller_id = ? AND r.status = 'delivered'`
-  ).get(userId).c;
-  const bought = await db.prepare(
+  ).get(userId));
+  const bought = getCount(await db.prepare(
     `SELECT COUNT(*) as c FROM requests WHERE buyer_id = ? AND status = 'delivered'`
-  ).get(userId).c;
+  ).get(userId));
 
-  // Response time (avg time from created_at to responded_at for seller's requests)
-  const avgResponse = await db.prepare(
-    `SELECT AVG(
-       (julianday(r.responded_at) - julianday(r.created_at)) * 24 * 60
-     ) as avg_minutes
-     FROM requests r JOIN listings l ON l.id = r.listing_id
-     WHERE l.seller_id = ? AND r.responded_at IS NOT NULL`
-  ).get(userId).avg_minutes;
+  // Response time (avg time from created_at to responded_at for seller's requests in minutes)
+  let avgResponse = null;
+  try {
+    const respRows = await db.prepare(
+      `SELECT r.created_at, r.responded_at
+       FROM requests r JOIN listings l ON l.id = r.listing_id
+       WHERE l.seller_id = ? AND r.responded_at IS NOT NULL`
+    ).all(userId);
+    if (respRows && respRows.length > 0) {
+      const diffs = respRows.map(r => (new Date(r.responded_at) - new Date(r.created_at)) / (1000 * 60));
+      avgResponse = Math.round(diffs.reduce((a, b) => a + b, 0) / diffs.length);
+    }
+  } catch (e) {}
 
   // Recent ratings received
-  const ratings = await db.prepare(
-    `SELECT ra.score, ra.comment, ra.created_at, u.name as rater_name
-     FROM ratings ra JOIN users u ON u.id = ra.rater_id
-     WHERE ra.ratee_id = ? ORDER BY ra.created_at DESC LIMIT 10`
-  ).all(userId);
+  let ratings = [];
+  try {
+    ratings = await db.prepare(
+      `SELECT ra.score, ra.comment, ra.created_at, u.name as rater_name
+       FROM ratings ra JOIN users u ON u.id = ra.rater_id
+       WHERE ra.ratee_id = ? ORDER BY ra.created_at DESC LIMIT 10`
+    ).all(userId) || [];
+  } catch (e) {}
 
   // No-show count
-  const noShows = await db.prepare(
+  const noShows = getCount(await db.prepare(
     `SELECT COUNT(*) as c FROM requests WHERE buyer_id = ? AND status = 'no_show'`
-  ).get(userId).c;
+  ).get(userId));
 
   // Free items donated
-  const freeItems = await db.prepare(
+  const freeItems = getCount(await db.prepare(
     `SELECT COUNT(*) as c FROM requests r JOIN listings l ON l.id = r.listing_id
      WHERE l.seller_id = ? AND r.status = 'delivered' AND l.price = 0`
-  ).get(userId).c;
+  ).get(userId));
 
   // Compute badges
   const badges = [];

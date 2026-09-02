@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Search, Grid3X3, List, Radio, CheckCircle } from "lucide-react";
+import { Search, Grid3X3, List, Radio, CheckCircle, Heart } from "lucide-react";
 import { api } from "../api";
 import { CATEGORIES, CATEGORY_ICONS } from "../constants/categories";
 import { StatusDot } from "../components/common/StatusDot";
@@ -28,6 +28,24 @@ export function BrowsePage({ onRequestListing }) {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("grid");
   const [inquiryModalQuery, setInquiryModalQuery] = useState(null);
+  const [freeOnly, setFreeOnly] = useState(false);
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("campus_favorites") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const toggleFavorite = (item) => {
+    setFavorites((prev) => {
+      const exists = prev.some((f) => f.id === item.id);
+      const next = exists ? prev.filter((f) => f.id !== item.id) : [...prev, item];
+      localStorage.setItem("campus_favorites", JSON.stringify(next));
+      window.dispatchEvent(new Event("favorites_updated"));
+      return next;
+    });
+  };
 
   const loadListings = useCallback(async () => {
     setLoading(true);
@@ -96,11 +114,18 @@ export function BrowsePage({ onRequestListing }) {
             {CATEGORY_ICONS[c]} {c}
           </button>
         ))}
+        <button
+          className={`btn ${freeOnly ? "btn-primary" : "btn-ghost"}`}
+          style={{ padding: "6px 14px", fontSize: 12, flexShrink: 0, border: freeOnly ? "none" : "1px dashed var(--signal)", color: freeOnly ? "var(--bg-deep)" : "var(--signal)" }}
+          onClick={() => setFreeOnly(!freeOnly)}
+        >
+          🎁 Free / Giveaway (₹0)
+        </button>
       </div>
 
       {loading ? (
         <div className="listing-grid"><Skeleton type="card" count={6} /></div>
-      ) : listings.length === 0 ? (
+      ) : (freeOnly ? listings.filter(l => l.price === 0) : listings).length === 0 ? (
         <div className="card">
           <EmptyState
             icon="🔍"
@@ -115,7 +140,7 @@ export function BrowsePage({ onRequestListing }) {
         </div>
       ) : viewMode === "grid" ? (
         <div className="listing-grid">
-          {listings.map((l) => (
+          {(freeOnly ? listings.filter(l => l.price === 0) : listings).map((l) => (
             <div key={l.id} className="card card-hover listing-card" style={{ display: "flex", flexDirection: "column" }}>
               <div style={{ position: "relative", height: "150px", overflow: "hidden", background: "var(--raised)" }}>
                 <img
@@ -123,6 +148,29 @@ export function BrowsePage({ onRequestListing }) {
                   alt={l.item_name}
                   style={{ width: "100%", height: "100%", objectFit: "cover" }}
                 />
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleFavorite(l); }}
+                  className="btn-icon"
+                  title={favorites.some(f => f.id === l.id) ? "Remove from Favorites" : "Add to Favorites"}
+                  style={{
+                    position: "absolute",
+                    top: 8,
+                    left: 8,
+                    background: "rgba(0,0,0,0.65)",
+                    backdropFilter: "blur(4px)",
+                    borderRadius: "50%",
+                    padding: 6,
+                    border: "none",
+                    cursor: "pointer",
+                    zIndex: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: favorites.some(f => f.id === l.id) ? "var(--red)" : "#fff"
+                  }}
+                >
+                  <Heart size={15} fill={favorites.some(f => f.id === l.id) ? "var(--red)" : "none"} />
+                </button>
                 <div style={{ position: "absolute", top: 8, right: 8 }}>
                   <StatusDot status={l.status} />
                 </div>
@@ -169,11 +217,19 @@ export function BrowsePage({ onRequestListing }) {
         </div>
       ) : (
         <div className="card" style={{ overflow: "hidden" }}>
-          {listings.map((l) => (
+          {(freeOnly ? listings.filter(l => l.price === 0) : listings).map((l) => (
             <div key={l.id} className="listing-row" style={{ cursor: l.status === "available" ? "pointer" : "default" }} onClick={() => l.status === "available" && onRequestListing(l)}>
               <span className="font-mono row-id" style={{ fontSize: 11, color: "var(--signal)" }}>{l.id.slice(0, 6)}</span>
               <div className="row-main">
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleFavorite(l); }}
+                    className="btn-icon"
+                    title={favorites.some(f => f.id === l.id) ? "Remove from Favorites" : "Add to Favorites"}
+                    style={{ border: "none", background: "transparent", color: favorites.some(f => f.id === l.id) ? "var(--red)" : "var(--muted)", cursor: "pointer" }}
+                  >
+                    <Heart size={15} fill={favorites.some(f => f.id === l.id) ? "var(--red)" : "none"} />
+                  </button>
                   <span style={{ fontSize: 14, fontWeight: 500 }}>{l.item_name}</span>
                   {l.seller_verified ? <Badge tone="green">Verified</Badge> : null}
                 </div>

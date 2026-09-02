@@ -131,7 +131,7 @@ export default function App() {
         {tab === "browse" && <BrowsePage onRequestListing={setRequestListing} />}
         {tab === "inquiries" && <InquiriesPage />}
         {tab === "inbox" && <SellerInbox onOpenPayment={setPaymentRequestId} />}
-        {tab === "wishlist" && <WishlistBoard />}
+        {tab === "wishlist" && <WishlistBoard onRequestListing={setRequestListing} />}
         {tab === "notion" && <NotionHub />}
         {tab === "profile" && <ProfilePage />}
         {tab === "admin" && <AdminPanel />}
