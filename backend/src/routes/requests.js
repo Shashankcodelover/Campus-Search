@@ -9,7 +9,7 @@ const router = express.Router();
 router.post("/", requireAuth, async (req, res) => {
   try {
     const { listing_id, quantity = 1 } = req.body;
-    const request = matchingService.createRequest(listing_id, req.user.id, parseInt(quantity, 10));
+    const request = await matchingService.createRequest(listing_id, req.user.id, parseInt(quantity, 10));
     res.status(201).json(request);
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
@@ -20,7 +20,7 @@ router.post("/", requireAuth, async (req, res) => {
 router.patch("/:id/respond", requireAuth, async (req, res) => {
   try {
     const { decision, delivery_day } = req.body; // decision: 'accept' | 'decline'
-    const updated = matchingService.respondToRequest(req.params.id, req.user.id, decision, delivery_day);
+    const updated = await matchingService.respondToRequest(req.params.id, req.user.id, decision, delivery_day);
     res.json(updated);
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
@@ -30,7 +30,7 @@ router.patch("/:id/respond", requireAuth, async (req, res) => {
 // Buyer confirms they received the item -> unlocks payment QR client-side
 router.patch("/:id/confirm-delivered", requireAuth, async (req, res) => {
   try {
-    const updated = matchingService.confirmDelivered(req.params.id, req.user.id);
+    const updated = await matchingService.confirmDelivered(req.params.id, req.user.id);
     res.json(updated);
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
@@ -53,15 +53,19 @@ router.get("/:id/contact", requireAuth, async (req, res) => {
 
 // Mine — for both buyer and seller dashboards
 router.get("/mine", requireAuth, async (req, res) => {
-  const asBuyer = db
-    .prepare(`SELECT r.*, l.item_name, l.listing_type, l.return_by FROM requests r JOIN listings l ON l.id = r.listing_id WHERE r.buyer_id = ? ORDER BY r.created_at DESC`)
-    .all(req.user.id);
-  const asSeller = db
-    .prepare(
-      `SELECT r.*, l.item_name, l.listing_type, l.return_by FROM requests r JOIN listings l ON l.id = r.listing_id WHERE l.seller_id = ? ORDER BY r.created_at DESC`
-    )
-    .all(req.user.id);
-  res.json({ asBuyer, asSeller });
+  try {
+    const asBuyer = await db
+      .prepare(`SELECT r.*, l.item_name, l.listing_type, l.return_by FROM requests r JOIN listings l ON l.id = r.listing_id WHERE r.buyer_id = ? ORDER BY r.created_at DESC`)
+      .all(req.user.id);
+    const asSeller = await db
+      .prepare(
+        `SELECT r.*, l.item_name, l.listing_type, l.return_by FROM requests r JOIN listings l ON l.id = r.listing_id WHERE l.seller_id = ? ORDER BY r.created_at DESC`
+      )
+      .all(req.user.id);
+    res.json({ asBuyer: asBuyer || [], asSeller: asSeller || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;

@@ -15,8 +15,10 @@ export function SellerInbox({ onOpenPayment }) {
   const load = useCallback(async () => {
     try {
       const data = await api.myRequests();
-      setAllRequests(data);
-      setRequests(data.asSeller.filter((r) => r.status === "notified"));
+      const asBuyer = Array.isArray(data?.asBuyer) ? data.asBuyer : [];
+      const asSeller = Array.isArray(data?.asSeller) ? data.asSeller : [];
+      setAllRequests({ asBuyer, asSeller });
+      setRequests(asSeller.filter((r) => r.status === "notified"));
     } catch (e) {}
     setLoading(false);
   }, []);
@@ -91,13 +93,13 @@ export function SellerInbox({ onOpenPayment }) {
       )}
 
       {/* Active Incoming Requests (Seller View: Accepted, waiting for buyer to confirm delivery) */}
-      {allRequests.asSeller.filter((r) => r.status === "accepted" || r.status === "delivered").length > 0 && (
+      {(allRequests?.asSeller || []).filter((r) => r.status === "accepted" || r.status === "delivered").length > 0 && (
         <div style={{ marginBottom: "28px" }}>
           <h4 style={{ color: "var(--signal)", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
             <MessageSquare size={15} /> Active Incoming Requests (To Deliver)
           </h4>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {allRequests.asSeller
+            {(allRequests?.asSeller || [])
               .filter((r) => r.status === "accepted" || r.status === "delivered")
               .map((r) => (
                 <div key={r.id} className="card" style={{ padding: 16 }}>
@@ -132,13 +134,13 @@ export function SellerInbox({ onOpenPayment }) {
       )}
 
       {/* Active Accepted Requests (Buyer View) */}
-      {allRequests.asBuyer.filter((r) => r.status === "accepted" || r.status === "delivered").length > 0 && (
+      {(allRequests?.asBuyer || []).filter((r) => r.status === "accepted" || r.status === "delivered").length > 0 && (
         <div style={{ marginBottom: "28px" }}>
           <h4 style={{ color: "var(--signal)", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
             <CheckCircle2 size={15} /> Active Outgoing Requests (As Buyer)
           </h4>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {allRequests.asBuyer
+            {(allRequests?.asBuyer || [])
               .filter((r) => r.status === "accepted" || r.status === "delivered")
               .map((r) => (
                 <div key={r.id} className="card" style={{ padding: 16 }}>
