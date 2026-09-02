@@ -8,9 +8,32 @@ import { Skeleton } from "../components/common/Skeleton";
 import { ListItemModal } from "../components/modals/ListItemModal";
 
 export function ProfilePage() {
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [upiVpa, setUpiVpa] = useState("");
+  const [profile, setProfile] = useState(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("cs_user") || "null");
+      if (u) {
+        return {
+          ...u,
+          stats: { listings: 0, activeListings: 0, sold: 0, bought: 0, noShows: 0 },
+          badges: [{ id: "student", label: "Campus Student", icon: "🎓" }],
+          recentListings: [],
+          ratings: []
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(false);
+  const [upiVpa, setUpiVpa] = useState(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("cs_user") || "null");
+      return u?.upi_vpa || "";
+    } catch {
+      return "";
+    }
+  });
   const [qrImage, setQrImage] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -23,11 +46,14 @@ export function ProfilePage() {
   const loadProfile = async () => {
     try {
       const data = await api.getMyProfile();
-      setProfile(data);
-      setUpiVpa(data.upi_vpa || "");
-      setQrImage(data.qr_image_data || "");
-    } catch (e) {}
-    setLoading(false);
+      if (data && data.name) {
+        setProfile((prev) => ({ ...prev, ...data }));
+        if (data.upi_vpa) setUpiVpa(data.upi_vpa);
+        if (data.qr_image_data) setQrImage(data.qr_image_data);
+      }
+    } catch (e) {
+      console.warn("Could not refresh live profile stats:", e);
+    }
   };
 
   const handleQrUpload = (e) => {
