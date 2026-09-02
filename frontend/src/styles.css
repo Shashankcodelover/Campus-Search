@@ -403,11 +403,10 @@ select.input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
-  max-width: 1120px;
+  padding: 10px 20px;
+  max-width: 1380px;
   margin: 0 auto;
   gap: 12px;
-  flex-wrap: wrap;
 }
 .navbar__brand {
   display: flex;
