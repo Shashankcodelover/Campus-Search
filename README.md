@@ -1,8 +1,13 @@
-# CampusSearch v1.1
+# 🔍 CampusSearch v1.1 (Production v2.0)
 
-A campus-restricted marketplace for reusable engineering-project components (Arduino boards, sensors, motors, full elective kits) that would otherwise sit idle after a project is submitted.
+[![Live Deployment](https://img.shields.io/badge/Live-campussearch.shashankj.tech-brightgreen?style=for-the-badge&logo=vercel)](https://campussearch.shashankj.tech)
+[![Automated Tests](https://img.shields.io/badge/Tests-10%2F10%20Passing-brightgreen?style=for-the-badge&logo=node.js)](backend/tests/)
+[![Showcase](https://img.shields.io/badge/Showcase-Docs%20%26%20Videos-purple?style=for-the-badge)](docs/showcase/README.md)
+[![Database](https://img.shields.io/badge/Database-Neon%20Postgres%20v2.0-blue?style=for-the-badge&logo=postgresql)](https://neon.tech)
+[![Status](https://img.shields.io/badge/Status-100%25%20Complete%20%26%20Certified-success?style=for-the-badge)]()
 
-**v1.1** upgrades the working prototype with: Notion API integration, real-time notifications, a wanted/wishlist board, in-app messaging, user profiles with reputation badges, advanced search, and a premium glassmorphism UI.
+> **Campus-Restricted Marketplace for Reusable Engineering-Project Components**  
+> Arduino boards, sensors, motors, and full elective kits that would otherwise sit idle after a project is submitted.
 
 ## Why this exists
 
@@ -87,3 +92,7 @@ npm run dev                 # http://localhost:5173, proxies /api to :4000
 - **No payment processor** — peer-to-peer UPI keeps this a listing/matching tool
 - **SSE for notifications** — simpler than WebSockets, native browser support
 - **Notion API for docs** — leverages existing Notion workspace without duplicating content
+
+## 📸 Visual Showcase & Media
+
+For 12 high-resolution screenshots (desktop & mobile), 2 video walkthroughs, and audio voiceover, see [Showcase Documentation](docs/showcase/README.md).

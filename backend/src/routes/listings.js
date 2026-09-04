@@ -127,7 +127,7 @@ router.post("/", requireAuth, async (req, res) => {
 });
 
 router.get("/:id", async (req, res) => {
-  const listing = db
+  const listing = await db
     .prepare(
       `SELECT l.*, u.name as seller_name, u.department as seller_department,
               u.verified as seller_verified, u.rating_avg as seller_rating, u.rating_count as seller_rating_count
