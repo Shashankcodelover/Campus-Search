@@ -130,6 +130,25 @@ export const api = {
   getMessages: (requestId) => request(`/messages/${requestId}`),
   sendMessage: (requestId, body) =>
     request(`/messages/${requestId}`, { method: "POST", body: JSON.stringify({ body }) }),
+
+  // ---- V3.0 Neural Copilot & Escrow Handshake ----
+  getNeuralStatus: () => request("/v3/neural/status"),
+  neuralSearch: (query, minConfidence = 30) => request("/v3/neural/search", {
+    method: "POST",
+    body: JSON.stringify({ query, minConfidence })
+  }),
+  optimizeBOM: (bomText, projectType) => request("/v3/neural/bom-optimize", {
+    method: "POST",
+    body: JSON.stringify({ bomText, projectType })
+  }),
+  generateEscrowHandshake: (data) => request("/v3/neural/handshake/generate", {
+    method: "POST",
+    body: JSON.stringify(data)
+  }),
+  verifyEscrowHandshake: (data) => request("/v3/neural/handshake/verify", {
+    method: "POST",
+    body: JSON.stringify(data)
+  }),
 };
 
 // Polling fallback for notifications
