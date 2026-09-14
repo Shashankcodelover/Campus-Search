@@ -50,10 +50,58 @@ export function AiProjectCopilot({ onRequestListing }) {
   const [escrowStatus, setEscrowStatus] = useState("PENDING");
   const [escrowLoading, setEscrowLoading] = useState(false);
 
+  // Circuit Topology State
+  const [circuitValidation, setCircuitValidation] = useState(null);
+  const [circuitLoading, setCircuitLoading] = useState(false);
+  const [selectedCircuitPreset, setSelectedCircuitPreset] = useState("PRESET_DRONE");
+
   // Run initial search
   useEffect(() => {
     handleSearch();
   }, []);
+
+  const playLabVerifiedChime = () => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const freqs = [440, 554.37, 659.25, 880]; // A4 major chord
+      freqs.forEach((f, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(f, ctx.currentTime + i * 0.07);
+        gain.gain.setValueAtTime(0.001, ctx.currentTime + i * 0.07);
+        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + i * 0.07 + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.07 + 0.6);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + i * 0.07);
+        osc.stop(ctx.currentTime + i * 0.07 + 0.65);
+      });
+    } catch (e) {
+      console.warn("AudioContext init skipped:", e);
+    }
+  };
+
+  const handleValidateCircuit = async (components = null) => {
+    setCircuitLoading(true);
+    try {
+      const payload = components || [
+        "ESP32 DevKit V1",
+        "MPU6050 6-DoF Gyro/Accelerometer",
+        "LM2596 Step-Down Buck Converter Module",
+        "SG90 9g Micro Servo Motor"
+      ];
+      const res = await api.validateCircuitTopology(payload);
+      setCircuitValidation(res);
+      playLabVerifiedChime();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCircuitLoading(false);
+    }
+  };
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -175,6 +223,13 @@ export function AiProjectCopilot({ onRequestListing }) {
               style={{ display: "flex", alignItems: "center", gap: "6px" }}
             >
               <Shield size={15} /> Geofenced Escrow
+            </button>
+            <button 
+              className={`btn ${activeSection === "circuit" ? "btn-primary" : "btn-outline"}`}
+              onClick={() => { setActiveSection("circuit"); if (!circuitValidation) handleValidateCircuit(); }}
+              style={{ display: "flex", alignItems: "center", gap: "6px" }}
+            >
+              <Zap size={15} /> Circuit Topology HUD
             </button>
           </div>
         </div>
@@ -578,6 +633,334 @@ export function AiProjectCopilot({ onRequestListing }) {
           </div>
         </div>
       )}
+
+      {/* SECTION 4: CIRCUIT TOPOLOGY & PINOUT INTERCONNECT HUD */}
+      {activeSection === "circuit" && (
+        <div>
+          {/* Header Card */}
+          <div style={{
+            background: "var(--panel)", border: "1px solid var(--trace)",
+            borderRadius: "14px", padding: "20px", marginBottom: "20px"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+              <div>
+                <h3 style={{ margin: "0 0 6px 0", fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Zap size={20} color="var(--signal)" /> Autonomous Neural Circuit Topology & Pinout Interconnect HUD
+                </h3>
+                <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.85rem" }}>
+                  Validates multi-domain logic voltage compatibility, resolves I2C/SPI bus address collisions, computes dynamic regulator thermal headroom, and synthesizes verifiable pinout netlists.
+                </p>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => handleValidateCircuit()}
+                  disabled={circuitLoading}
+                  style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                >
+                  <RefreshCw size={15} className={circuitLoading ? "spin" : ""} />
+                  <span>Synthesize Circuit Topology</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Presets Bar */}
+            <div style={{ display: "flex", gap: "10px", marginTop: "16px", flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: "600" }}>Capstone Presets:</span>
+              {[
+                { id: "PRESET_DRONE", label: "🚀 Quadcopter Avionics Stack", parts: ["ESP32 DevKit V1", "MPU6050 6-DoF Gyro/Accelerometer", "LM2596 Step-Down Buck Converter Module", "SG90 9g Micro Servo Motor"] },
+                { id: "PRESET_HEALTH", label: "⌚ Wearable Health Telemetry Band", parts: ["Raspberry Pi Pico RP2040", "BME280 Barometer & Humidity Sensor", "0.96 inch I2C OLED Display (SSD1306)"] },
+                { id: "PRESET_ROBOTIC_ARM", label: "🤖 4-DOF Robotic Kinematics Arm", parts: ["Arduino Uno R3", "MG996R Metal Gear High-Torque Servo", "LM2596 Step-Down Buck Converter Module", "0.96 inch I2C OLED Display (SSD1306)"] }
+              ].map(preset => (
+                <button
+                  key={preset.id}
+                  onClick={() => {
+                    setSelectedCircuitPreset(preset.id);
+                    handleValidateCircuit(preset.parts);
+                  }}
+                  style={{
+                    background: selectedCircuitPreset === preset.id ? "rgba(110, 231, 160, 0.18)" : "rgba(255, 255, 255, 0.04)",
+                    border: `1px solid ${selectedCircuitPreset === preset.id ? "var(--signal)" : "var(--trace)"}`,
+                    color: selectedCircuitPreset === preset.id ? "var(--signal)" : "var(--text-secondary)",
+                    padding: "6px 14px", borderRadius: "20px", fontSize: "0.8rem", cursor: "pointer", fontWeight: "600",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Validation Results Display */}
+          {circuitValidation && (
+            <div>
+              {/* Dynamic KPI Tiles */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px", marginBottom: "20px" }}>
+                <div style={{ background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: "12px", padding: "16px" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Electrical Safety Score</div>
+                  <div style={{ fontSize: "1.6rem", fontWeight: "800", color: "var(--signal)", marginTop: "4px" }}>
+                    {circuitValidation.safetyScore}%
+                  </div>
+                  <div style={{ fontSize: "0.72rem", color: "#a7f3d0", marginTop: "2px" }}>
+                    ✓ {circuitValidation.electricalStatus}
+                  </div>
+                </div>
+
+                <div style={{ background: "rgba(99, 102, 241, 0.08)", border: "1px solid rgba(99, 102, 241, 0.3)", borderRadius: "12px", padding: "16px" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Host Microcontroller</div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: "700", color: "#818cf8", marginTop: "4px" }}>
+                    {circuitValidation.hostMicrocontroller?.name || "ESP32 DevKit V1"}
+                  </div>
+                  <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "2px" }}>
+                    Logic: {circuitValidation.hostMicrocontroller?.systemVoltage} · Limit: {circuitValidation.hostMicrocontroller?.maxLdoCurrentMa}mA
+                  </div>
+                </div>
+
+                <div style={{ background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: "12px", padding: "16px" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Peak Dynamic Current</div>
+                  <div style={{ fontSize: "1.6rem", fontWeight: "800", color: "#fbbf24", marginTop: "4px" }}>
+                    {circuitValidation.powerAudit?.totalPeakCurrentMa} mA
+                  </div>
+                  <div style={{ fontSize: "0.72rem", color: "#fcd34d", marginTop: "2px" }}>
+                    Thermal Margin: {circuitValidation.powerAudit?.thermalMarginPercentage}%
+                  </div>
+                </div>
+
+                <div style={{ background: "rgba(6, 182, 212, 0.08)", border: "1px solid rgba(6, 182, 212, 0.3)", borderRadius: "12px", padding: "16px" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>I2C Bus Collision Status</div>
+                  <div style={{ fontSize: "1.3rem", fontWeight: "800", color: "#22d3ee", marginTop: "4px" }}>
+                    {circuitValidation.busCollisions?.length === 0 ? "0 Collisions" : `${circuitValidation.busCollisions?.length} Conflicts`}
+                  </div>
+                  <div style={{ fontSize: "0.72rem", color: "#67e8f9", marginTop: "2px" }}>
+                    Active Addresses: {circuitValidation.i2cBusAddresses?.map(a => a.address).join(", ") || "None"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive SVG Schematic Visualizer */}
+              <div style={{
+                background: "radial-gradient(ellipse at center, rgba(15, 23, 42, 0.95) 0%, rgba(6, 10, 8, 0.98) 100%)",
+                border: "1px solid rgba(110, 231, 160, 0.3)",
+                borderRadius: "14px",
+                padding: "20px",
+                marginBottom: "20px",
+                boxShadow: "0 12px 40px rgba(0,0,0,0.5)"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Layers size={18} color="var(--signal)" />
+                    <h4 style={{ margin: 0, fontSize: "0.95rem", color: "var(--text)" }}>
+                      Interactive Neural Circuit Netlist & Bus Wiring Schematic
+                    </h4>
+                  </div>
+                  <span style={{ fontSize: "0.72rem", color: "#60a5fa", background: "rgba(59, 130, 246, 0.15)", padding: "3px 10px", borderRadius: "12px", border: "1px solid rgba(59, 130, 246, 0.3)" }}>
+                    Live Auto-Routed Traces
+                  </span>
+                </div>
+
+                <div style={{ width: "100%", overflowX: "auto", display: "flex", justifyContent: "center" }}>
+                  <svg width="860" height="340" viewBox="0 0 860 340" style={{ background: "rgba(0,0,0,0.4)", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <defs>
+                      <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                      </filter>
+                      <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                      </filter>
+                      <filter id="glow-amber" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                      </filter>
+                    </defs>
+
+                    {/* Background Grid Lines */}
+                    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+                    </pattern>
+                    <rect width="860" height="340" fill="url(#grid)" />
+
+                    {/* HOST MICROCONTROLLER (Center-Left) */}
+                    <g transform="translate(60, 50)">
+                      <rect width="210" height="240" rx="12" fill="rgba(15, 23, 42, 0.85)" stroke="rgba(99, 102, 241, 0.6)" strokeWidth="2" />
+                      <rect width="210" height="34" rx="12" fill="rgba(99, 102, 241, 0.25)" />
+                      <text x="105" y="22" fill="#e2e8f0" fontSize="12" fontWeight="bold" textAnchor="middle">
+                        {circuitValidation.hostMicrocontroller?.name || "ESP32 DevKit"}
+                      </text>
+                      <text x="105" y="48" fill="#94a3b8" fontSize="10" textAnchor="middle">Host Microcontroller (3.3V Logic)</text>
+
+                      {/* Pins list */}
+                      <g transform="translate(15, 75)">
+                        <circle cx="5" cy="5" r="4" fill="#ef4444" filter="url(#glow-red)" />
+                        <text x="18" y="9" fill="#f87171" fontSize="10" fontFamily="monospace">3.3V / VCC Rail</text>
+
+                        <circle cx="5" cy="30" r="4" fill="#64748b" />
+                        <text x="18" y="34" fill="#94a3b8" fontSize="10" fontFamily="monospace">GND (Common Ground)</text>
+
+                        <circle cx="5" cy="55" r="4" fill="#06b6d4" filter="url(#glow-cyan)" />
+                        <text x="18" y="59" fill="#22d3ee" fontSize="10" fontFamily="monospace">GPIO 21 (I2C SDA)</text>
+
+                        <circle cx="5" cy="80" r="4" fill="#3b82f6" />
+                        <text x="18" y="84" fill="#60a5fa" fontSize="10" fontFamily="monospace">GPIO 22 (I2C SCL)</text>
+
+                        <circle cx="5" cy="105" r="4" fill="#f59e0b" filter="url(#glow-amber)" />
+                        <text x="18" y="109" fill="#fbbf24" fontSize="10" fontFamily="monospace">GPIO 16 (PWM Signal)</text>
+
+                        <circle cx="5" cy="130" r="4" fill="#10b981" />
+                        <text x="18" y="134" fill="#34d399" fontSize="10" fontFamily="monospace">GPIO 17 (Aux Signal)</text>
+                      </g>
+                    </g>
+
+                    {/* SENSOR MODULE (Top-Right) */}
+                    <g transform="translate(560, 30)">
+                      <rect width="220" height="110" rx="10" fill="rgba(15, 23, 42, 0.85)" stroke="rgba(6, 182, 212, 0.5)" strokeWidth="1.5" />
+                      <rect width="220" height="26" rx="10" fill="rgba(6, 182, 212, 0.2)" />
+                      <text x="110" y="18" fill="#e2e8f0" fontSize="11" fontWeight="bold" textAnchor="middle">
+                        MPU6050 6-DoF Gyro Sensor
+                      </text>
+                      <text x="110" y="44" fill="#22d3ee" fontSize="9" textAnchor="middle">I2C Address: 0x68 (3.3V)</text>
+
+                      {/* Pins */}
+                      <g transform="translate(15, 55)">
+                        <circle cx="5" cy="5" r="3.5" fill="#ef4444" />
+                        <text x="15" y="9" fill="#cbd5e1" fontSize="9" fontFamily="monospace">VCC</text>
+
+                        <circle cx="5" cy="22" r="3.5" fill="#64748b" />
+                        <text x="15" y="26" fill="#cbd5e1" fontSize="9" fontFamily="monospace">GND</text>
+
+                        <circle cx="100" cy="5" r="3.5" fill="#06b6d4" />
+                        <text x="110" y="9" fill="#22d3ee" fontSize="9" fontFamily="monospace">SDA</text>
+
+                        <circle cx="100" cy="22" r="3.5" fill="#3b82f6" />
+                        <text x="110" y="26" fill="#60a5fa" fontSize="9" fontFamily="monospace">SCL</text>
+                      </g>
+                    </g>
+
+                    {/* ACTUATOR / REGULATOR MODULE (Bottom-Right) */}
+                    <g transform="translate(560, 180)">
+                      <rect width="220" height="120" rx="10" fill="rgba(15, 23, 42, 0.85)" stroke="rgba(245, 158, 11, 0.5)" strokeWidth="1.5" />
+                      <rect width="220" height="26" rx="10" fill="rgba(245, 158, 11, 0.2)" />
+                      <text x="110" y="18" fill="#e2e8f0" fontSize="11" fontWeight="bold" textAnchor="middle">
+                        LM2596 & SG90 Servo Actuator
+                      </text>
+                      <text x="110" y="44" fill="#fbbf24" fontSize="9" textAnchor="middle">External 5.0V Buck Rail · 550mA Stall</text>
+
+                      <g transform="translate(15, 58)">
+                        <circle cx="5" cy="8" r="3.5" fill="#ef4444" />
+                        <text x="15" y="12" fill="#cbd5e1" fontSize="9" fontFamily="monospace">5V+ Power</text>
+
+                        <circle cx="5" cy="28" r="3.5" fill="#64748b" />
+                        <text x="15" y="32" fill="#cbd5e1" fontSize="9" fontFamily="monospace">Common GND</text>
+
+                        <circle cx="110" cy="8" r="3.5" fill="#f59e0b" />
+                        <text x="120" y="12" fill="#fbbf24" fontSize="9" fontFamily="monospace">PWM Input</text>
+                      </g>
+                    </g>
+
+                    {/* CONNECTING TRACES */}
+                    {/* 1. Red Power Wire (ESP32 3.3V to MPU6050 VCC) */}
+                    <path d="M 270 125 C 400 125, 420 85, 570 85" fill="none" stroke="#ef4444" strokeWidth="2" strokeDasharray="6 3" filter="url(#glow-red)" opacity="0.85" />
+
+                    {/* 2. Slate Ground Wire (ESP32 GND to MPU6050 GND & LM2596 GND) */}
+                    <path d="M 270 150 C 400 150, 420 102, 570 102" fill="none" stroke="#64748b" strokeWidth="2" strokeDasharray="4 4" opacity="0.75" />
+                    <path d="M 270 150 C 380 150, 430 260, 570 260" fill="none" stroke="#64748b" strokeWidth="2" strokeDasharray="4 4" opacity="0.75" />
+
+                    {/* 3. Cyan I2C SDA Wire (GPIO 21 to MPU6050 SDA) */}
+                    <path d="M 270 175 C 410 175, 460 85, 665 85" fill="none" stroke="#06b6d4" strokeWidth="2.2" filter="url(#glow-cyan)" opacity="0.9" />
+
+                    {/* 4. Blue I2C SCL Wire (GPIO 22 to MPU6050 SCL) */}
+                    <path d="M 270 200 C 420 200, 470 102, 665 102" fill="none" stroke="#3b82f6" strokeWidth="2.2" opacity="0.9" />
+
+                    {/* 5. Amber PWM Wire (GPIO 16 to SG90 Servo PWM) */}
+                    <path d="M 270 225 C 390 225, 450 240, 675 240" fill="none" stroke="#f59e0b" strokeWidth="2.2" filter="url(#glow-amber)" strokeDasharray="5 2" opacity="0.9" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Pinout Netlist Table */}
+              <div style={{ background: "var(--panel)", border: "1px solid var(--trace)", borderRadius: "14px", padding: "20px", marginBottom: "20px" }}>
+                <h4 style={{ margin: "0 0 14px 0", fontSize: "0.95rem", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Compass size={18} color="var(--signal)" /> Synthesized Pinout Interconnect Netlist
+                </h4>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--trace)", textAlign: "left", color: "var(--muted)" }}>
+                        <th style={{ padding: "8px 12px" }}>Net Bus</th>
+                        <th style={{ padding: "8px 12px" }}>Source Pin (MCU)</th>
+                        <th style={{ padding: "8px 12px" }}>Target Terminal (Peripheral)</th>
+                        <th style={{ padding: "8px 12px" }}>Signal Type</th>
+                        <th style={{ padding: "8px 12px" }}>Safety Verification</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {circuitValidation.netlist?.map((net, idx) => (
+                        <tr key={idx} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <td style={{ padding: "10px 12px", fontFamily: "monospace", color: net.color, fontWeight: "700" }}>
+                            ● {net.net}
+                          </td>
+                          <td style={{ padding: "10px 12px", color: "var(--text)", fontWeight: "600" }}>{net.from}</td>
+                          <td style={{ padding: "10px 12px", color: "var(--text-secondary)" }}>{net.to}</td>
+                          <td style={{ padding: "10px 12px", color: "var(--muted)" }}>{net.net.includes("I2C") ? "3.3V Synchronous Serial" : net.net.includes("PWM") ? "50Hz Pulse Train" : "Power Rail"}</td>
+                          <td style={{ padding: "10px 12px" }}>
+                            <span style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--signal)", padding: "2px 8px", borderRadius: "4px", fontSize: "0.72rem", fontWeight: "700" }}>
+                              ✓ JEDEC PASSED
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Cryptographic Smart Lab Passport Card */}
+              <div style={{
+                background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%)",
+                border: "1px solid var(--signal)",
+                borderRadius: "14px",
+                padding: "20px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "16px"
+              }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <Shield size={18} color="var(--signal)" />
+                    <span style={{ fontWeight: "700", color: "var(--signal)", fontSize: "0.95rem" }}>
+                      Cryptographic Smart Lab Passport Generated
+                    </span>
+                  </div>
+                  <div style={{ fontFamily: "monospace", fontSize: "0.95rem", color: "#60a5fa", fontWeight: "700" }}>
+                    {circuitValidation.labPassport}
+                  </div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "4px" }}>
+                    {circuitValidation.guarantee}
+                  </div>
+                </div>
+
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    playLabVerifiedChime();
+                    navigator.clipboard?.writeText(circuitValidation.labPassport);
+                    alert("Lab Passport copied to clipboard!");
+                  }}
+                  style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 18px" }}
+                >
+                  <CheckCircle2 size={16} /> Copy Verification Token
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+

@@ -145,9 +145,12 @@ export const api = {
     method: "POST",
     body: JSON.stringify(data)
   }),
-  verifyEscrowHandshake: (data) => request("/v3/neural/handshake/verify", {
+  // ---- V3.2 Circuit Topology & Pinout Interconnect Validator ----
+  getCircuitStatus: () => request("/v3/circuit/status"),
+  getCircuitPresets: () => request("/v3/circuit/presets"),
+  validateCircuitTopology: (components) => request("/v3/circuit/validate", {
     method: "POST",
-    body: JSON.stringify(data)
+    body: JSON.stringify({ components })
   }),
 };
 

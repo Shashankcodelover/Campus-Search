@@ -70,6 +70,9 @@ app.use("/api/payments", require("./routes/payments"));
 // Flagship upgrade routes (v3.0): Autonomous Neural BOM Copilot & Escrow Handshake
 app.use("/api/v3/neural", require("./routes/neuralCopilot"));
 
+// Diamond upgrade routes (v3.2): Autonomous Circuit Topology & Pinout Interconnect Validator
+app.use("/api/v3/circuit", require("./routes/circuitTopology"));
+
 app.get("/", (req, res) => res.json({ ok: true, name: "CampusSearch API", version: "3.0.0", dbReady }));
 app.get("/health", (req, res) => res.json({ ok: true, version: "2.0.0", dbReady }));
 app.get("/api/health", (req, res) => res.json({ ok: true, version: "2.0.0", dbReady }));
