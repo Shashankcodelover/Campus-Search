@@ -152,6 +152,65 @@ export const api = {
     method: "POST",
     body: JSON.stringify({ components })
   }),
+
+  // ---- Enterprise Upgrade: Hardware Topology Mesh Corridors ----
+  getComponentRelations: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/component-relations?${qs}`);
+  },
+  getComponentRelationMetrics: () => request("/component-relations/metrics"),
+  createComponentRelation: (body) => request("/component-relations", {
+    method: "POST",
+    body: JSON.stringify(body)
+  }),
+  deleteComponentRelation: (id) => request(`/component-relations/${id}`, { method: "DELETE" }),
+  uploadComponentRelations: (csvOrJson) => {
+    const isString = typeof csvOrJson === "string";
+    return request("/component-relations/upload", {
+      method: "POST",
+      headers: isString ? { "Content-Type": "text/plain" } : { "Content-Type": "application/json" },
+      body: isString ? csvOrJson : JSON.stringify(csvOrJson)
+    });
+  },
+
+  // ---- Enterprise Upgrade: Universal Batch Ingestion & Deletions ----
+  uploadListings: (csvOrJson) => {
+    const isString = typeof csvOrJson === "string";
+    return request("/listings/upload", {
+      method: "POST",
+      headers: isString ? { "Content-Type": "text/plain" } : { "Content-Type": "application/json" },
+      body: isString ? csvOrJson : JSON.stringify(csvOrJson)
+    });
+  },
+  uploadWishlists: (csvOrJson) => {
+    const isString = typeof csvOrJson === "string";
+    return request("/wishlists/upload", {
+      method: "POST",
+      headers: isString ? { "Content-Type": "text/plain" } : { "Content-Type": "application/json" },
+      body: isString ? csvOrJson : JSON.stringify(csvOrJson)
+    });
+  },
+  uploadInquiries: (csvOrJson) => {
+    const isString = typeof csvOrJson === "string";
+    return request("/inquiries/upload", {
+      method: "POST",
+      headers: isString ? { "Content-Type": "text/plain" } : { "Content-Type": "application/json" },
+      body: isString ? csvOrJson : JSON.stringify(csvOrJson)
+    });
+  },
+  uploadUsers: (csvOrJson) => {
+    const isString = typeof csvOrJson === "string";
+    return request("/admin/users/upload", {
+      method: "POST",
+      headers: isString ? { "Content-Type": "text/plain" } : { "Content-Type": "application/json" },
+      body: isString ? csvOrJson : JSON.stringify(csvOrJson)
+    });
+  },
+  deleteListingPermanent: (id) => request(`/listings/${id}?permanent=true`, { method: "DELETE" }),
+  deleteInquiry: (id) => request(`/inquiries/${id}`, { method: "DELETE" }),
+  deleteRequest: (id) => request(`/requests/${id}`, { method: "DELETE" }),
+  getAdminUsers: () => request("/admin/users"),
+  deleteUser: (id) => request(`/admin/users/${id}`, { method: "DELETE" }),
 };
 
 // Polling fallback for notifications

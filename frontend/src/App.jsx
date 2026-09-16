@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LayoutGrid, Inbox, Radio, Heart, BookOpen, User, ShieldCheck, Moon, Sun, Cpu } from "lucide-react";
+import { LayoutGrid, Inbox, Radio, Heart, BookOpen, User, ShieldCheck, Moon, Sun, Cpu, Network, UploadCloud } from "lucide-react";
 import { api, hasToken, clearToken, connectSSE } from "./api";
 import { Navbar } from "./components/layout/Navbar";
 import { AuthScreen } from "./components/modals/AuthScreen";
@@ -15,6 +15,8 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { AdminPanel } from "./pages/AdminPanel";
 import { LandingPage } from "./pages/LandingPage";
 import { AiProjectCopilot } from "./pages/AiProjectCopilot";
+import { TopologyMeshPage } from "./pages/TopologyMeshPage";
+import { BulkIngestionStudio } from "./pages/BulkIngestionStudio";
 import { ToastContainer } from "./components/notifications/ToastContainer";
 
 export default function App() {
@@ -96,6 +98,8 @@ export default function App() {
   const tabs = [
     { id: "browse", label: "Browse", icon: <LayoutGrid size={14} /> },
     { id: "copilot", label: "🧠 AI Copilot & BOM", icon: <Cpu size={14} /> },
+    { id: "topology", label: "Topology Mesh", icon: <Network size={14} /> },
+    { id: "ingestion", label: "Bulk Ingestion", icon: <UploadCloud size={14} /> },
     { 
       id: "inquiries", label: "Inquiries", icon: <Radio size={14} />,
       badge: (unreadBreakdown["inquiry_broadcast"] || 0) + (unreadBreakdown["inquiry_response"] || 0)
@@ -132,6 +136,8 @@ export default function App() {
       <div className="container page-content">
         {tab === "browse" && <BrowsePage onRequestListing={setRequestListing} />}
         {tab === "copilot" && <AiProjectCopilot onRequestListing={setRequestListing} />}
+        {tab === "topology" && <TopologyMeshPage />}
+        {tab === "ingestion" && <BulkIngestionStudio />}
         {tab === "inquiries" && <InquiriesPage />}
         {tab === "inbox" && <SellerInbox onOpenPayment={setPaymentRequestId} />}
         {tab === "wishlist" && <WishlistBoard onRequestListing={setRequestListing} />}

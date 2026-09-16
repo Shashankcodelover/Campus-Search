@@ -29,6 +29,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json({ limit: "15mb" })); // Base64 ID photos & listing image uploads
+app.use(express.text({ limit: "15mb", type: ["text/plain", "text/csv", "application/csv"] }));
 app.use(morgan("dev"));
 
 // Rate limiting — 2000 requests per 15 min window, ignore notification polling
@@ -72,6 +73,9 @@ app.use("/api/v3/neural", require("./routes/neuralCopilot"));
 
 // Diamond upgrade routes (v3.2): Autonomous Circuit Topology & Pinout Interconnect Validator
 app.use("/api/v3/circuit", require("./routes/circuitTopology"));
+
+// Enterprise fleet upgrade: Hardware Topology Mesh Corridors & Batch Uploadation
+app.use("/api/component-relations", require("./routes/componentRelations"));
 
 app.get("/", (req, res) => res.json({ ok: true, name: "CampusSearch API", version: "3.0.0", dbReady }));
 app.get("/health", (req, res) => res.json({ ok: true, version: "2.0.0", dbReady }));

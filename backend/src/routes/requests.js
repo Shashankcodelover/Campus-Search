@@ -68,4 +68,26 @@ router.get("/mine", requireAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/requests/:id — Buyer, seller or admin can remove a request (cascading messages and intents)
+router.delete("/:id", requireAuth, async (req, res) => {
+  try {
+    const request = await db.prepare("SELECT r.*, l.seller_id FROM requests r JOIN listings l ON l.id = r.listing_id WHERE r.id = ?").get(req.params.id);
+    if (!request) return res.status(404).json({ error: "Request not found." });
+    if (request.buyer_id !== req.user.id && request.seller_id !== req.user.id && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Not authorized to delete this request." });
+    }
+
+    // Cascade dependent records
+    await db.prepare("DELETE FROM messages WHERE request_id = ?").run(req.params.id);
+    await db.prepare("DELETE FROM payment_intents WHERE request_id = ?").run(req.params.id);
+    await db.prepare("DELETE FROM ratings WHERE request_id = ?").run(req.params.id);
+    await db.prepare("DELETE FROM fee_ledger WHERE request_id = ?").run(req.params.id);
+    await db.prepare("DELETE FROM requests WHERE id = ?").run(req.params.id);
+
+    res.json({ ok: true, deletedId: req.params.id, message: "Request and related messages/payments deleted." });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

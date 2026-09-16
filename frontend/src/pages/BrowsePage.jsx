@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Search, Grid3X3, List, Radio, CheckCircle, Heart } from "lucide-react";
+import { Search, Grid3X3, List, Radio, CheckCircle, Heart, Trash2 } from "lucide-react";
 import { api } from "../api";
 import { CATEGORIES, CATEGORY_ICONS } from "../constants/categories";
 import { StatusDot } from "../components/common/StatusDot";
@@ -191,12 +191,39 @@ export function BrowsePage({ onRequestListing }) {
                 </div>
 
 
-                <div className="listing-card__footer" style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--trace)", paddingBottom: 10 }}>
+                <div className="listing-card__footer" style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--trace)", paddingBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div className="listing-card__seller">
                     <Avatar name={l.seller_name} size="sm" />
                     <span style={{ fontSize: 12 }}>{l.seller_name}</span>
                     {l.seller_verified ? <CheckCircle size={14} color="var(--signal)" /> : null}
                   </div>
+                  <button
+                    className="btn-icon"
+                    title="Delete listing (Cascade)"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`Delete listing "${l.item_name}"? This cascades requests, payments, and ratings.`)) {
+                        try {
+                          await api.deleteListingPermanent(l.id);
+                          setListings(prev => prev.filter(x => x.id !== l.id));
+                        } catch (err) {
+                          alert(err.message || "Failed to delete listing.");
+                        }
+                      }
+                    }}
+                    style={{
+                      background: "rgba(239, 68, 68, 0.1)",
+                      border: "1px solid rgba(239, 68, 68, 0.2)",
+                      color: "#ef4444",
+                      borderRadius: 6,
+                      padding: "4px 8px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center"
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
                 </div>
                 {l.status === "available" && (
                   <button
@@ -232,9 +259,34 @@ export function BrowsePage({ onRequestListing }) {
               </div>
               <span className="font-mono row-price" style={{ fontSize: 14, justifySelf: "end" }}>{l.price === 0 ? "Free" : `₹${l.price}`}</span>
               <span className="row-status" style={{ justifySelf: "end" }}><StatusDot status={l.status} qty={l.quantity} /></span>
-              <span className="row-action" style={{ justifySelf: "end" }}>
+              <span className="row-action" style={{ justifySelf: "end", display: "flex", gap: 6, alignItems: "center" }}>
                 <button disabled={l.status !== "available"} className="btn btn-ghost btn-sm">
                   {l.status === "available" ? "Request" : l.status}
+                </button>
+                <button
+                  className="btn-icon"
+                  title="Delete listing (Cascade)"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (window.confirm(`Delete listing "${l.item_name}"?`)) {
+                      try {
+                        await api.deleteListingPermanent(l.id);
+                        setListings(prev => prev.filter(x => x.id !== l.id));
+                      } catch (err) {
+                        alert(err.message || "Failed to delete listing.");
+                      }
+                    }
+                  }}
+                  style={{
+                    background: "rgba(239, 68, 68, 0.1)",
+                    border: "1px solid rgba(239, 68, 68, 0.2)",
+                    color: "#ef4444",
+                    borderRadius: 6,
+                    padding: "4px 8px",
+                    cursor: "pointer"
+                  }}
+                >
+                  <Trash2 size={13} />
                 </button>
               </span>
             </div>

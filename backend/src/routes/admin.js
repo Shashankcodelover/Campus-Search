@@ -101,6 +101,166 @@ router.get("/stats", async (req, res) => {
   });
 });
 
+// GET /api/admin/users — List all registered users
+router.get("/users", async (req, res) => {
+  const users = await db.prepare(
+    `SELECT id, name, email, phone, department, year, usn, role, verified, admin_verified, rating_avg, suspended, created_at
+     FROM users ORDER BY created_at DESC`
+  ).all();
+  res.json(users);
+});
+
+// DELETE /api/admin/users/:id — Universal cascading deletion of user account
+router.delete("/users/:id", async (req, res) => {
+  try {
+    const user = await db.prepare("SELECT * FROM users WHERE id = ?").get(req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found." });
+
+    const userId = req.params.id;
+
+    // 1. Delete notifications
+    await db.prepare("DELETE FROM notifications WHERE user_id = ?").run(userId);
+
+    // 2. Delete messages sent by user
+    await db.prepare("DELETE FROM messages WHERE sender_id = ?").run(userId);
+
+    // 3. Delete wishlists
+    await db.prepare("DELETE FROM wishlists WHERE user_id = ?").run(userId);
+
+    // 4. Delete inquiry responses by user
+    await db.prepare("DELETE FROM inquiry_responses WHERE seller_id = ?").run(userId);
+
+    // 5. Delete inquiries by user (and their responses)
+    const inqs = await db.prepare("SELECT id FROM inquiries WHERE buyer_id = ?").all(userId);
+    for (const inq of inqs) {
+      await db.prepare("DELETE FROM inquiry_responses WHERE inquiry_id = ?").run(inq.id);
+    }
+    await db.prepare("DELETE FROM inquiries WHERE buyer_id = ?").run(userId);
+
+    // 6. Delete requests where user is buyer
+    const buyerReqs = await db.prepare("SELECT id FROM requests WHERE buyer_id = ?").all(userId);
+    for (const r of buyerReqs) {
+      await db.prepare("DELETE FROM messages WHERE request_id = ?").run(r.id);
+      await db.prepare("DELETE FROM payment_intents WHERE request_id = ?").run(r.id);
+      await db.prepare("DELETE FROM ratings WHERE request_id = ?").run(r.id);
+      await db.prepare("DELETE FROM fee_ledger WHERE request_id = ?").run(r.id);
+    }
+    await db.prepare("DELETE FROM requests WHERE buyer_id = ?").run(userId);
+
+    // 7. Delete listings by user (and their requests/flags)
+    const userListings = await db.prepare("SELECT id FROM listings WHERE seller_id = ?").all(userId);
+    for (const l of userListings) {
+      const lReqs = await db.prepare("SELECT id FROM requests WHERE listing_id = ?").all(l.id);
+      for (const r of lReqs) {
+        await db.prepare("DELETE FROM messages WHERE request_id = ?").run(r.id);
+        await db.prepare("DELETE FROM payment_intents WHERE request_id = ?").run(r.id);
+        await db.prepare("DELETE FROM ratings WHERE request_id = ?").run(r.id);
+        await db.prepare("DELETE FROM fee_ledger WHERE request_id = ?").run(r.id);
+      }
+      await db.prepare("DELETE FROM requests WHERE listing_id = ?").run(l.id);
+      await db.prepare("DELETE FROM flags WHERE listing_id = ?").run(l.id);
+      await db.prepare("DELETE FROM inquiry_responses WHERE listing_id = ?").run(l.id);
+    }
+    await db.prepare("DELETE FROM listings WHERE seller_id = ?").run(userId);
+
+    // 8. Delete ratings where user is rater or ratee
+    await db.prepare("DELETE FROM ratings WHERE rater_id = ? OR ratee_id = ?").run(userId, userId);
+
+    // 9. Delete fee ledger where user is seller
+    await db.prepare("DELETE FROM fee_ledger WHERE seller_id = ?").run(userId);
+
+    // 10. Delete user record
+    await db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+
+    res.json({ ok: true, deletedId: userId, message: "User account and all associated relational records permanently deleted." });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Helper for CSV parsing
+function parseUsersCsv(csvText) {
+  const lines = csvText.trim().split(/\r?\n/).filter(line => line.trim().length > 0);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map(h => h.trim().replace(/^["']|["']$/g, ""));
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const values = [];
+    let current = "";
+    let inQuotes = false;
+    for (let c = 0; c < rawLine.length; c++) {
+      const char = rawLine[c];
+      if (char === '"' || char === "'") inQuotes = !inQuotes;
+      else if (char === ',' && !inQuotes) {
+        values.push(current.trim().replace(/^["']|["']$/g, ""));
+        current = "";
+      } else current += char;
+    }
+    values.push(current.trim().replace(/^["']|["']$/g, ""));
+    const rowObj = {};
+    headers.forEach((h, idx) => { rowObj[h] = values[idx] !== undefined ? values[idx] : ""; });
+    rows.push(rowObj);
+  }
+  return rows;
+}
+
+// POST /api/admin/users/upload — Batch ingest student / faculty roster
+router.post("/users/upload", async (req, res) => {
+  try {
+    const bcrypt = require("bcryptjs");
+    const { v4: uuid } = require("uuid");
+
+    let items = [];
+    if (Array.isArray(req.body)) items = req.body;
+    else if (typeof req.body === "string") items = parseUsersCsv(req.body);
+    else if (req.body && req.body.csv) items = parseUsersCsv(req.body.csv);
+    else if (req.body && Array.isArray(req.body.data)) items = req.body.data;
+    else if (req.body && typeof req.body.data === "string") items = parseUsersCsv(req.body.data);
+
+    if (!items || items.length === 0) return res.status(400).json({ error: "No records found in payload." });
+
+    const defaultPassHash = await bcrypt.hash("campus1234", 10);
+    const inserted = [];
+
+    for (const item of items) {
+      const name = item.name || item.fullName;
+      const email = item.email;
+      if (!name || !email) continue;
+
+      const id = item.id || uuid();
+      const phone = item.phone || "";
+      const department = item.department || "ECE";
+      const year = item.year || "1st yr";
+      const usn = item.usn || `1SK24${department.substring(0, 2).toUpperCase()}${Math.floor(100 + Math.random() * 899)}`;
+      const role = item.role || "student";
+      const passHash = item.password ? await bcrypt.hash(item.password, 10) : defaultPassHash;
+
+      await db.prepare(
+        `INSERT INTO users (id, name, email, phone, department, year, usn, role, password_hash, verified, admin_verified)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)
+         ON CONFLICT (email) DO UPDATE SET
+           name = EXCLUDED.name,
+           department = EXCLUDED.department,
+           year = EXCLUDED.year,
+           usn = EXCLUDED.usn,
+           role = EXCLUDED.role`
+      ).run(id, name, email, phone, department, year, usn, role, passHash);
+
+      inserted.push({ id, name, email, usn, department, role });
+    }
+
+    res.status(201).json({
+      ok: true,
+      count: inserted.length,
+      message: `Successfully ingested ${inserted.length} users into campus registry.`,
+      records: inserted
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PATCH /api/admin/users/:id/suspend — Suspend a user
 router.patch("/users/:id/suspend", async (req, res) => {
   const { reason } = req.body;

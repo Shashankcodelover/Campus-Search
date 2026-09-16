@@ -200,6 +200,22 @@ CREATE TABLE IF NOT EXISTS wishlists (
 );
 
 -- ============================
+-- COMPONENT RELATIONS (Hardware Topology Mesh)
+-- ============================
+CREATE TABLE IF NOT EXISTS component_relations (
+  id TEXT PRIMARY KEY,
+  source_component TEXT NOT NULL,
+  target_device TEXT NOT NULL,
+  interface_bus TEXT NOT NULL,
+  voltage_domain TEXT NOT NULL,
+  lab_station TEXT NOT NULL,
+  current_draw_ma INTEGER NOT NULL DEFAULT 150,
+  status TEXT NOT NULL DEFAULT 'active',
+  notes TEXT DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ============================
 -- INDEXES
 -- ============================
 CREATE INDEX IF NOT EXISTS idx_listings_status ON listings(status);
@@ -216,3 +232,6 @@ CREATE INDEX IF NOT EXISTS idx_inquiries_buyer ON inquiries(buyer_id);
 CREATE INDEX IF NOT EXISTS idx_inquiry_responses_inquiry ON inquiry_responses(inquiry_id);
 CREATE INDEX IF NOT EXISTS idx_users_usn ON users(usn);
 CREATE INDEX IF NOT EXISTS idx_users_verified ON users(admin_verified);
+CREATE INDEX IF NOT EXISTS idx_component_relations_source ON component_relations(source_component);
+CREATE INDEX IF NOT EXISTS idx_component_relations_bus ON component_relations(interface_bus);
+CREATE INDEX IF NOT EXISTS idx_component_relations_status ON component_relations(status);

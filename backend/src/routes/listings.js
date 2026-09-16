@@ -142,7 +142,7 @@ router.get("/:id", async (req, res) => {
   res.json(listing);
 });
 
-// DELETE /api/listings/:id — seller can remove their own listing
+// DELETE /api/listings/:id — seller or admin can remove or permanently cascade delete listing
 router.delete("/:id", requireAuth, async (req, res) => {
   const listing = await db.prepare("SELECT * FROM listings WHERE id = ?").get(req.params.id);
   if (!listing) return res.status(404).json({ error: "Listing not found." });
@@ -150,8 +150,118 @@ router.delete("/:id", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Not your listing." });
   }
 
+  const isPermanent = req.query.permanent === "true" || req.user.role === "admin";
+  if (isPermanent) {
+    // Cascading deletion
+    const reqs = await db.prepare("SELECT id FROM requests WHERE listing_id = ?").all(req.params.id);
+    for (const r of reqs) {
+      await db.prepare("DELETE FROM messages WHERE request_id = ?").run(r.id);
+      await db.prepare("DELETE FROM payment_intents WHERE request_id = ?").run(r.id);
+      await db.prepare("DELETE FROM ratings WHERE request_id = ?").run(r.id);
+      await db.prepare("DELETE FROM fee_ledger WHERE request_id = ?").run(r.id);
+    }
+    await db.prepare("DELETE FROM requests WHERE listing_id = ?").run(req.params.id);
+    await db.prepare("DELETE FROM flags WHERE listing_id = ?").run(req.params.id);
+    await db.prepare("DELETE FROM inquiry_responses WHERE listing_id = ?").run(req.params.id);
+    await db.prepare("DELETE FROM listings WHERE id = ?").run(req.params.id);
+    return res.json({ ok: true, deletedId: req.params.id, permanent: true, message: "Listing and dependent records permanently deleted." });
+  }
+
   await db.prepare("UPDATE listings SET status = 'removed' WHERE id = ?").run(req.params.id);
-  res.json({ ok: true });
+  res.json({ ok: true, deletedId: req.params.id, permanent: false, message: "Listing archived to removed status." });
+});
+
+// Helper for CSV parsing
+function parseListingsCsv(csvText) {
+  const lines = csvText.trim().split(/\r?\n/).filter(line => line.trim().length > 0);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map(h => h.trim().replace(/^["']|["']$/g, ""));
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const values = [];
+    let current = "";
+    let inQuotes = false;
+    for (let c = 0; c < rawLine.length; c++) {
+      const char = rawLine[c];
+      if (char === '"' || char === "'") inQuotes = !inQuotes;
+      else if (char === ',' && !inQuotes) {
+        values.push(current.trim().replace(/^["']|["']$/g, ""));
+        current = "";
+      } else current += char;
+    }
+    values.push(current.trim().replace(/^["']|["']$/g, ""));
+    const rowObj = {};
+    headers.forEach((h, idx) => { rowObj[h] = values[idx] !== undefined ? values[idx] : ""; });
+    rows.push(rowObj);
+  }
+  return rows;
+}
+
+// POST /api/listings/upload — Batch ingest component listings (CSV or JSON)
+router.post("/upload", requireAuth, async (req, res) => {
+  try {
+    let items = [];
+    if (Array.isArray(req.body)) {
+      items = req.body;
+    } else if (typeof req.body === "string") {
+      items = parseListingsCsv(req.body);
+    } else if (req.body && req.body.csv) {
+      items = parseListingsCsv(req.body.csv);
+    } else if (req.body && Array.isArray(req.body.data)) {
+      items = req.body.data;
+    } else if (req.body && typeof req.body.data === "string") {
+      items = parseListingsCsv(req.body.data);
+    }
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: "No records found. Provide CSV string or JSON array." });
+    }
+
+    const inserted = [];
+    const expiresAt = new Date(Date.now() + LISTING_LIFETIME_DAYS * 86400000).toISOString();
+
+    for (const item of items) {
+      const id = item.id || uuid();
+      const name = item.item_name || item.name || item.title;
+      if (!name) continue;
+
+      const category = item.category || "Passive Components";
+      const condition = item.condition_notes || item.condition || "Working";
+      const description = item.description || "";
+      const price = parseInt(item.price || "0", 10) || 0;
+      const quantity = parseInt(item.quantity || "1", 10) || 1;
+      const listing_type = item.listing_type || item.type || "sale";
+      const return_by = item.return_by || null;
+      const image_data = item.image_data || item.image || null;
+
+      await db.prepare(
+        `INSERT INTO listings (id, seller_id, item_name, category, condition_notes, description, price, quantity, listing_type, return_by, image_data, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET
+           item_name = EXCLUDED.item_name,
+           category = EXCLUDED.category,
+           condition_notes = EXCLUDED.condition_notes,
+           description = EXCLUDED.description,
+           price = EXCLUDED.price,
+           quantity = EXCLUDED.quantity,
+           listing_type = EXCLUDED.listing_type,
+           return_by = EXCLUDED.return_by,
+           image_data = EXCLUDED.image_data`
+      ).run(id, req.user.id, name, category, condition, description, price, quantity, listing_type, return_by, image_data, expiresAt);
+
+      inserted.push({ id, item_name: name, category, price, quantity });
+    }
+
+    res.status(201).json({
+      ok: true,
+      count: inserted.length,
+      message: `Successfully ingested ${inserted.length} component listings.`,
+      records: inserted
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // PATCH /api/listings/:id — edit listing details
@@ -185,3 +295,4 @@ async function sweepExpiredListings() {
 
 module.exports = router;
 module.exports.sweepExpiredListings = sweepExpiredListings;
+
