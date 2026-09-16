@@ -50,9 +50,10 @@ router.get("/mine", requireAuth, async (req, res) => {
 // GET /api/inquiries/incoming — Seller views broadcast inquiries relevant to them
 router.get("/incoming", requireAuth, async (req, res) => {
   // Find open inquiries matching categories seller has available listings in
-  const sellerCategories = await db.prepare(
+  const sellerRows = await db.prepare(
     `SELECT DISTINCT category FROM listings WHERE seller_id = ? AND status = 'available'`
-  ).all(req.user.id).map(c => c.category);
+  ).all(req.user.id);
+  const sellerCategories = (sellerRows || []).map(c => c.category);
 
   if (sellerCategories.length === 0) {
     // If seller has no active listings, return empty or open inquiries
