@@ -1,5 +1,7 @@
 # CampusSearch v1.1
 
+🌐 **Live Demo:** https://campus-search.shashankj.tech
+
 A campus-restricted marketplace for reusable engineering-project components (Arduino boards, sensors, motors, full elective kits) that would otherwise sit idle after a project is submitted.
 
 **v1.1** upgrades the working prototype with: Notion API integration, real-time notifications, a wanted/wishlist board, in-app messaging, user profiles with reputation badges, advanced search, and a premium glassmorphism UI.
