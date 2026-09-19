@@ -11,3 +11,8 @@ dist/
 labtop b/
 remainder/
 .neon
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+scratch/
+/screenshots/

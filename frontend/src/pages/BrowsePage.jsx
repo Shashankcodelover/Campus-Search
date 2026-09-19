@@ -17,7 +17,7 @@ const CATEGORY_IMAGES = {
   "Power & Wiring": "https://images.unsplash.com/photo-1555664424-778a1e5e1b48?auto=format&fit=crop&w=400&q=80",
   Tools: "https://images.unsplash.com/photo-1581092162384-8987c1d64718?auto=format&fit=crop&w=400&q=80",
   "Full Kits": "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=400&q=80",
-  "Passive Components": "https://images.unsplash.com/photo-1608564697071-fe8a8034db3f?auto=format&fit=crop&w=400&q=80",
+  "Passive Components": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=400&q=80",
 };
 
 export function BrowsePage({ onRequestListing }) {

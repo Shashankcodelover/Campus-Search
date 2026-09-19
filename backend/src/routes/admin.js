@@ -15,12 +15,16 @@ router.use(requireAuth, requireRole("admin", "moderator"));
 
 // GET /api/admin/flags — Open moderation flags
 router.get("/flags", async (req, res) => {
-  const flags = db
-    .prepare(
-      `SELECT f.*, l.item_name FROM flags f JOIN listings l ON l.id = f.listing_id WHERE f.status = 'open' ORDER BY f.created_at DESC`
-    )
-    .all();
-  res.json(flags);
+  try {
+    const flags = await db
+      .prepare(
+        `SELECT f.*, l.item_name FROM flags f JOIN listings l ON l.id = f.listing_id WHERE f.status = 'open' ORDER BY f.created_at DESC`
+      )
+      .all();
+    res.json(flags || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // PATCH /api/admin/flags/:id — Resolve a flag (remove/clear)
@@ -33,15 +37,19 @@ router.patch("/flags/:id", async (req, res) => {
 
 // GET /api/admin/pending-verifications — Users awaiting USN + ID card verification
 router.get("/pending-verifications", async (req, res) => {
-  const pending = db
-    .prepare(
-      `SELECT id, name, email, usn, department, year, created_at, id_photo_data
-       FROM users 
-       WHERE admin_verified = 0 AND suspended = 0
-       ORDER BY created_at ASC`
-    )
-    .all();
-  res.json(pending);
+  try {
+    const pending = await db
+      .prepare(
+        `SELECT id, name, email, usn, department, year, created_at, id_photo_data
+         FROM users 
+         WHERE admin_verified = 0 AND suspended = 0
+         ORDER BY created_at ASC`
+      )
+      .all();
+    res.json(pending || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // POST /api/admin/verify-user/:id — Admin approves user's ID
@@ -83,22 +91,34 @@ router.post("/reject-user/:id", async (req, res) => {
 
 // GET /api/admin/stats — Dashboard summary statistics
 router.get("/stats", async (req, res) => {
-  const active = await db.prepare("SELECT COUNT(*) c FROM listings WHERE status = 'available'").get().c;
-  const pending = await db.prepare("SELECT COUNT(*) c FROM listings WHERE status = 'pending'").get().c;
-  const openFlags = await db.prepare("SELECT COUNT(*) c FROM flags WHERE status = 'open'").get().c;
-  const totalUsers = await db.prepare("SELECT COUNT(*) c FROM users").get().c;
-  const verifiedUsers = await db.prepare("SELECT COUNT(*) c FROM users WHERE admin_verified = 1").get().c;
-  const pendingVerifications = await db.prepare("SELECT COUNT(*) c FROM users WHERE admin_verified = 0 AND suspended = 0").get().c;
-  const feesPending = await db.prepare("SELECT COALESCE(SUM(amount),0) s FROM fee_ledger WHERE settled = 0").get().s;
+  try {
+    const activeRow = await db.prepare("SELECT COUNT(*) c FROM listings WHERE status = 'available'").get();
+    const pendingRow = await db.prepare("SELECT COUNT(*) c FROM listings WHERE status = 'pending'").get();
+    const openFlagsRow = await db.prepare("SELECT COUNT(*) c FROM flags WHERE status = 'open'").get();
+    const totalUsersRow = await db.prepare("SELECT COUNT(*) c FROM users").get();
+    const verifiedUsersRow = await db.prepare("SELECT COUNT(*) c FROM users WHERE admin_verified = 1").get();
+    const pendingVerifRow = await db.prepare("SELECT COUNT(*) c FROM users WHERE admin_verified = 0 AND suspended = 0").get();
+    const feesRow = await db.prepare("SELECT COALESCE(SUM(amount),0) s FROM fee_ledger WHERE settled = 0").get();
 
-  res.json({
-    active,
-    pending,
-    openFlags,
-    pendingVerifications,
-    verifiedPct: totalUsers ? Math.round((verifiedUsers / totalUsers) * 100) : 0,
-    feesPendingSettlement: feesPending,
-  });
+    const active = parseInt(activeRow?.c || "0", 10);
+    const pending = parseInt(pendingRow?.c || "0", 10);
+    const openFlags = parseInt(openFlagsRow?.c || "0", 10);
+    const totalUsers = parseInt(totalUsersRow?.c || "0", 10);
+    const verifiedUsers = parseInt(verifiedUsersRow?.c || "0", 10);
+    const pendingVerifications = parseInt(pendingVerifRow?.c || "0", 10);
+    const feesPending = parseFloat(feesRow?.s || "0");
+
+    res.json({
+      active,
+      pending,
+      openFlags,
+      pendingVerifications,
+      verifiedPct: totalUsers ? Math.round((verifiedUsers / totalUsers) * 100) : 0,
+      feesPendingSettlement: feesPending,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GET /api/admin/users — List all registered users

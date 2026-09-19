@@ -76,6 +76,33 @@ export function AuthScreen({ onAuthed }) {
           <button onClick={() => setMode("register")} className={`auth-tab ${mode === "register" ? "auth-tab--active" : ""}`}>Register</button>
         </div>
 
+        {mode === "login" && (
+          <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
+            <button
+              type="button"
+              id="demo-student-btn"
+              className="btn btn-secondary"
+              style={{ flex: 1, fontSize: "11.5px", padding: "7px 10px", borderColor: "var(--signal)", color: "var(--signal)" }}
+              onClick={() => {
+                setForm((f) => ({ ...f, email: "aravind.k@college.edu", password: "demo1234" }));
+              }}
+            >
+              ⚡ Demo Student
+            </button>
+            <button
+              type="button"
+              id="demo-admin-btn"
+              className="btn btn-secondary"
+              style={{ flex: 1, fontSize: "11.5px", padding: "7px 10px", borderColor: "var(--signal)", color: "var(--signal)" }}
+              onClick={() => {
+                setForm((f) => ({ ...f, email: "admin@college.edu", password: "demo1234" }));
+              }}
+            >
+              🛡️ Demo Admin
+            </button>
+          </div>
+        )}
+
         <div className="auth-form" onKeyDown={handleKeyDown}>
           {mode === "register" && (
             <>

@@ -155,8 +155,11 @@ export const api = {
 
   // ---- Enterprise Upgrade: Hardware Topology Mesh Corridors ----
   getComponentRelations: (params = {}) => {
-    const qs = new URLSearchParams(params).toString();
-    return request(`/component-relations?${qs}`);
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== "")
+    );
+    const qs = new URLSearchParams(cleanParams).toString();
+    return request(`/component-relations${qs ? `?${qs}` : ""}`);
   },
   getComponentRelationMetrics: () => request("/component-relations/metrics"),
   createComponentRelation: (body) => request("/component-relations", {
@@ -211,6 +214,14 @@ export const api = {
   deleteRequest: (id) => request(`/requests/${id}`, { method: "DELETE" }),
   getAdminUsers: () => request("/admin/users"),
   deleteUser: (id) => request(`/admin/users/${id}`, { method: "DELETE" }),
+
+  // ---- Admin Panel ----
+  adminStats: () => request("/admin/stats"),
+  adminFlags: () => request("/admin/flags"),
+  getPendingVerifications: () => request("/admin/pending-verifications"),
+  resolveFlag: (id, action) => request(`/admin/flags/${id}`, { method: "PATCH", body: JSON.stringify({ action }) }),
+  verifyUser: (id) => request(`/admin/verify-user/${id}`, { method: "POST" }),
+  rejectUser: (id, reason) => request(`/admin/reject-user/${id}`, { method: "POST", body: JSON.stringify({ reason }) }),
 };
 
 // Polling fallback for notifications
