@@ -107,3 +107,13 @@ npm run dev                 # http://localhost:5173, proxies /api to :4000
 ## 📸 Visual Showcase & Media
 
 For 12 high-resolution screenshots (desktop & mobile), 2 video walkthroughs, and audio voiceover, see [Showcase Documentation](docs/showcase/README.md).
+
+
+## User Flow Verification
+
+![User Flow](docs/campussearch_schematic_verified.png)
+![User Flow](docs/campus_copilot_verified.png)
+![User Flow](docs/campus_home_verified.png)
+![User Flow](docs/campus_search_neural_copilot_verified.png)
+![User Flow](docs/campus_search_neural_search_verified.png)
+
