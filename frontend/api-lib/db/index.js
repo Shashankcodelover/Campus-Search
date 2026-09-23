@@ -8,14 +8,48 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('neon.tech') ? { rejectUnauthorized: false } : false
 });
 
+let isFallback = false;
+let sqliteDb = null;
+
+function initSqlite() {
+  if (sqliteDb) return;
+  const Database = require('better-sqlite3');
+  // Use /tmp for Vercel Serverless
+  sqliteDb = new Database('/tmp/fallback.sqlite');
+  console.warn("Neon DB quota exceeded! Falling back to /tmp/fallback.sqlite");
+  
+  const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
+  sqliteDb.exec(schema);
+  isFallback = true;
+}
+
 class DatabaseWrapper {
   async query(sql, params = []) {
     let i = 1;
-    // VERY IMPORTANT: replace ? with $1, $2 ONLY if it's not inside a string.
-    // A quick hack is just string replace but it's dangerous if strings contain '?'.
-    // Better to use a simplistic regex for our use case where '?' is isolated.
     const pgSql = sql.replace(/\?/g, () => `$${i++}`);
-    return await pool.query(pgSql, params);
+    
+    if (isFallback) {
+      // Better-sqlite3 is synchronous
+      const stmt = sqliteDb.prepare(sql);
+      if (sql.trim().toUpperCase().startsWith('SELECT') || sql.trim().toUpperCase().startsWith('PRAGMA')) {
+        const rows = stmt.all(...params);
+        return { rows, rowCount: rows.length };
+      } else {
+        const info = stmt.run(...params);
+        // Map to pg-like response
+        return { rowCount: info.changes, rows: [{ id: info.lastInsertRowid }] };
+      }
+    }
+
+    try {
+      return await pool.query(pgSql, params);
+    } catch (err) {
+      if (err.message && (err.message.includes('quota') || err.message.includes('password authentication failed') || err.message.includes('Endpoint is disabled'))) {
+        initSqlite();
+        return await this.query(sql, params);
+      }
+      throw err;
+    }
   }
 
   prepare(sql) {
@@ -40,7 +74,20 @@ class DatabaseWrapper {
   }
 
   async exec(sql) {
-    await pool.query(sql);
+    if (isFallback) {
+      sqliteDb.exec(sql);
+      return;
+    }
+    try {
+      await pool.query(sql);
+    } catch (err) {
+      if (err.message && (err.message.includes('quota') || err.message.includes('password authentication failed') || err.message.includes('Endpoint is disabled'))) {
+        initSqlite();
+        sqliteDb.exec(sql);
+      } else {
+        throw err;
+      }
+    }
   }
 }
 
@@ -52,11 +99,19 @@ async function initSchema() {
     .replace(/INTEGER PRIMARY KEY AUTOINCREMENT/g, 'SERIAL PRIMARY KEY')
     .replace(/datetime\('now'\)/g, 'CURRENT_TIMESTAMP')
     .replace(/datetime\('now',\s*'\+2 hours'\)/g, "CURRENT_TIMESTAMP + INTERVAL '2 hours'")
-    .replace(/REAL/g, 'FLOAT')
-    // Remove DEFAULT 0 from integer/boolean fields that Postgres prefers as false? Actually Postgres accepts 0 for integers.
-    // but SQLite booleans are integer 0 or 1. If it's a numeric column it's fine.
+    .replace(/REAL/g, 'FLOAT');
   
-  await pool.query(pgSchema);
+  if (!isFallback) {
+    try {
+      await pool.query(pgSchema);
+    } catch (err) {
+      if (err.message && (err.message.includes('quota') || err.message.includes('password authentication failed') || err.message.includes('Endpoint is disabled'))) {
+        initSqlite();
+      } else {
+        console.error("Schema init error:", err);
+      }
+    }
+  }
   return database;
 }
 

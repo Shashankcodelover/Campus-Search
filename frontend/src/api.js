@@ -233,13 +233,21 @@ export function connectSSE(onEvent) {
   let lastCount = -1;
 
   const poll = async () => {
+    if (!hasToken()) {
+      if (interval) clearInterval(interval);
+      return;
+    }
     try {
       const { count } = await api.getUnreadCount();
       if (count !== lastCount) {
         lastCount = count;
         onEvent({ type: "notification_count", count });
       }
-    } catch (e) {}
+    } catch (e) {
+      if (e.message && e.message.includes("401")) {
+        if (interval) clearInterval(interval);
+      }
+    }
   };
 
   poll();
