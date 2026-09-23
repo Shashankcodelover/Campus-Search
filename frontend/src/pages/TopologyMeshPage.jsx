@@ -189,9 +189,9 @@ export function TopologyMeshPage() {
         <div className="card" style={{ padding: 18, background: "var(--surface, #1e293b)", border: "1px solid var(--border, #334155)", borderRadius: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-secondary)", fontSize: 13, marginBottom: 6 }}>
             <span>Total Current Draw</span>
-            <Zap size={16} color="#a855f7" />
+            <Zap size={16} color="#3b82f6" />
           </div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: "#a855f7" }}>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "#3b82f6" }}>
             {metrics.totalCurrentDrawMa || 935} <span style={{ fontSize: 14 }}>mA</span>
           </div>
           <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
@@ -279,7 +279,7 @@ export function TopologyMeshPage() {
                       fontSize: 11, 
                       fontWeight: 600,
                       background: isI2C ? "rgba(59, 130, 246, 0.15)" : isSPI ? "rgba(168, 85, 247, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                      color: isI2C ? "#3b82f6" : isSPI ? "#a855f7" : "#f59e0b",
+                      color: isI2C ? "#3b82f6" : isSPI ? "#3b82f6" : "#f59e0b",
                       border: `1px solid ${isI2C ? "rgba(59, 130, 246, 0.3)" : isSPI ? "rgba(168, 85, 247, 0.3)" : "rgba(245, 158, 11, 0.3)"}`
                     }}>
                       {c.interface_bus}

@@ -29,7 +29,7 @@
   --red-glow: rgba(226, 102, 95, 0.15);
   --blue: #5b9cf5;
   --blue-glow: rgba(91, 156, 245, 0.15);
-  --purple: #a78bfa;
+  --blue: #a78bfa;
 
   /* Text */
   --text: #e9f1ec;
@@ -367,7 +367,7 @@ select.input {
 .badge-red { background: var(--red-glow); color: var(--red); border: 1px solid rgba(226, 102, 95, 0.3); }
 .badge-blue { background: var(--blue-glow); color: var(--blue); border: 1px solid rgba(91, 156, 245, 0.3); }
 .badge-muted { background: var(--raised); color: var(--muted); border: 1px solid var(--trace); }
-.badge-purple { background: rgba(167, 139, 250, 0.1); color: var(--purple); border: 1px solid rgba(167, 139, 250, 0.3); }
+.badge-blue { background: rgba(167, 139, 250, 0.1); color: var(--blue); border: 1px solid rgba(167, 139, 250, 0.3); }
 
 /* ========== STATUS DOT ========== */
 .status-dot {

@@ -65,6 +65,7 @@ async function register({ name, email, phone, department, year, usn, id_photo_da
 }
 
 async function login(email, password) {
+  if (!email || !password) throw httpError(400, "Email and password are required.");
   const user = await db.prepare("SELECT * FROM users WHERE email = ?").get(email.toLowerCase().trim());
   if (!user) throw httpError(401, "Invalid email or password.");
   if (user.suspended) throw httpError(403, "This account has been suspended. Contact admin.");
