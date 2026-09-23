@@ -1398,3 +1398,6 @@ select.input {
   border: 1px solid var(--glass-border);
 }
 
+
+#nav-list-btn { display: inline-flex !important; }
+
