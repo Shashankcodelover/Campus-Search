@@ -66,7 +66,8 @@ class DatabaseWrapper {
         const pgSql = sql.replace(/\?/g, () => `$${i++}`);
         return await pgPool.query(pgSql, params);
       } catch (err) {
-        if (err.code === '53000' || err.message?.includes('quota') || err.message?.includes('exceeded')) {
+        const errStr = err && err.message ? err.message.toLowerCase() : String(err).toLowerCase();
+        if (err.code === '53000' || errStr.includes('quota') || errStr.includes('exceeded') || errStr.includes('limit')) {
           console.warn('[DB Engine] Neon PostgreSQL quota exceeded (code 53000). Seamlessly falling back to SQLite engine.');
           this.engine = 'sqlite';
           activeEngine = 'sqlite';
@@ -125,7 +126,8 @@ class DatabaseWrapper {
         await pgPool.query(sql);
         return;
       } catch (err) {
-        if (err.code === '53000' || err.message?.includes('quota') || err.message?.includes('exceeded')) {
+        const errStr = err && err.message ? err.message.toLowerCase() : String(err).toLowerCase();
+        if (err.code === '53000' || errStr.includes('quota') || errStr.includes('exceeded') || errStr.includes('limit')) {
           console.warn('[DB Engine] Neon PostgreSQL quota exceeded on exec. Falling back to SQLite.');
           this.engine = 'sqlite';
           activeEngine = 'sqlite';
@@ -275,7 +277,8 @@ async function initSchema() {
           
           await pgPool.query(pgSchema);
         } catch (err) {
-          if (err.code === '53000' || err.message?.includes('quota') || err.message?.includes('exceeded')) {
+          const errStr = err && err.message ? err.message.toLowerCase() : String(err).toLowerCase();
+          if (err.code === '53000' || errStr.includes('quota') || errStr.includes('exceeded') || errStr.includes('limit')) {
             console.warn('[DB Engine] Neon PostgreSQL quota exceeded during schema init. Falling back to SQLite.');
             database.engine = 'sqlite';
             activeEngine = 'sqlite';
