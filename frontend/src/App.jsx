@@ -18,6 +18,8 @@ import { AiProjectCopilot } from "./pages/AiProjectCopilot";
 import { TopologyMeshPage } from "./pages/TopologyMeshPage";
 import { BulkIngestionStudio } from "./pages/BulkIngestionStudio";
 import { ToastContainer } from "./components/notifications/ToastContainer";
+import { PrivacyPolicy } from "./pages/PrivacyPolicy";
+import { TermsOfService } from "./pages/TermsOfService";
 
 export default function App() {
   const [authed, setAuthed] = useState(hasToken());
@@ -144,7 +146,15 @@ export default function App() {
         {tab === "notion" && <NotionHub />}
         {tab === "profile" && <ProfilePage />}
         {tab === "admin" && <AdminPanel />}
+        {tab === "privacy" && <PrivacyPolicy />}
+        {tab === "terms" && <TermsOfService />}
       </div>
+
+      <footer style={{ textAlign: "center", padding: "1rem", marginTop: "2rem", borderTop: "1px solid var(--border)", fontSize: "12px", color: "var(--text-muted)" }}>
+        <a href="#" onClick={(e) => { e.preventDefault(); setTab("privacy"); }} style={{ margin: "0 10px", color: "inherit", textDecoration: "none" }}>Privacy Policy</a>
+        |
+        <a href="#" onClick={(e) => { e.preventDefault(); setTab("terms"); }} style={{ margin: "0 10px", color: "inherit", textDecoration: "none" }}>Terms of Service</a>
+      </footer>
 
       {requestListing && <RequestModal listing={requestListing} onClose={() => setRequestListing(null)} onRefresh={() => setTab("inbox")} />}
       {paymentRequestId && <PaymentModal requestId={paymentRequestId} onClose={() => setPaymentRequestId(null)} onPaymentConfirmed={() => setTab("inbox")} />}

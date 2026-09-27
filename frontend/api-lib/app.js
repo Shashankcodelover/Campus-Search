@@ -78,6 +78,10 @@ app.get("/", (req, res) => res.json({ ok: true, name: "CampusSearch API", versio
 app.get("/health", (req, res) => res.json({ ok: true, version: "2.0.0", dbReady }));
 app.get("/api/health", (req, res) => res.json({ ok: true, version: "2.0.0", dbReady }));
 
+app.use((req, res, next) => {
+  res.status(404).json({ error: "Not Found", message: "The requested API route does not exist." });
+});
+
 app.use((err, req, res, next) => {
 
   console.error(err);

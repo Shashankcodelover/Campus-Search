@@ -98,6 +98,14 @@ export function LandingPage({ onGetStarted }) {
         </motion.div>
 
       </div>
+
+      <div style={{ marginTop: "auto", textAlign: "center", padding: "20px", color: "var(--muted)", fontSize: "13px" }}>
+        <p>&copy; {new Date().getFullYear()} CampusSearch. All rights reserved.</p>
+        <div style={{ display: "flex", justifyContent: "center", gap: "16px", marginTop: "8px" }}>
+          <a href="#privacy" style={{ color: "var(--signal)" }}>Privacy Policy</a>
+          <a href="#terms" style={{ color: "var(--signal)" }}>Terms of Service</a>
+        </div>
+      </div>
     </div>
   );
 }

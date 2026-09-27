@@ -16,3 +16,4 @@ remainder/
 *.sqlite-journal
 scratch/
 /screenshots/
+.vercel
