@@ -38,15 +38,29 @@ export function LandingPage({ onGetStarted }) {
             Borrow, buy, and sell components safely within your campus. No more waiting for online deliveries.
           </p>
           
-          <motion.button 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={onGetStarted} 
-            className="btn btn-primary" 
-            style={{ padding: "16px 36px", fontSize: 16, borderRadius: "var(--radius-full)", boxShadow: "var(--shadow-glow)" }}
-          >
-            Join Your Campus <ArrowRight size={18} />
-          </motion.button>
+          <div style={{ display: "flex", gap: "16px", justifyContent: "center" }}>
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onGetStarted} 
+              className="btn btn-primary" 
+              style={{ padding: "16px 36px", fontSize: 16, borderRadius: "var(--radius-full)", boxShadow: "var(--shadow-glow)" }}
+            >
+              Join Your Campus <ArrowRight size={18} />
+            </motion.button>
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                localStorage.setItem("cs_token", "demo_token");
+                window.location.reload();
+              }} 
+              className="btn" 
+              style={{ padding: "16px 36px", fontSize: 16, borderRadius: "var(--radius-full)", background: "white", color: "#333", border: "1px solid #ddd" }}
+            >
+              Demo
+            </motion.button>
+          </div>
         </motion.div>
 
         {/* How it Works / Features */}
